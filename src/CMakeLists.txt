@@ -1,25 +1,15 @@
 
-add_library(libxsdcpp OBJECT
+add_library(libxsdcpp STATIC
     Xsd.cpp
     Xsd.hpp
     Generator.cpp
     Generator.hpp
 )
-target_link_libraries(libxsdcpp PUBLIC
-    libnstd::Document
-)
-target_compile_features(libxsdcpp PUBLIC
-    cxx_override
-)
+target_compile_features(libxsdcpp PUBLIC cxx_override)
+target_link_libraries(libxsdcpp PUBLIC libnstd::Document)
 
-add_executable(xsdcpp
+add_executable(xsdcpp 
     Main.cpp
 )
-
-target_compile_definitions(xsdcpp PRIVATE
-     "VERSION=\"${PROJECT_VERSION}\""
-)
-
-target_link_libraries(xsdcpp PRIVATE
-    libxsdcpp
-)
+target_link_libraries(xsdcpp PUBLIC libxsdcpp)
+target_compile_definitions(xsdcpp PRIVATE "VERSION=\"${PROJECT_VERSION}\"")

@@ -16,7 +16,8 @@ pipeline {
                     stage('Build') {
                         steps {
                             cmakeBuild buildDir: 'build', installation: 'InSearchPath', buildType: 'MinSizeRel', cmakeArgs: '-G Ninja'
-                            cmake workingDir: 'build', arguments: '--build . --target package', installation: 'InSearchPath'
+                            cmake workingDir: 'build', arguments: '--build .', installation: 'InSearchPath'
+                            //cmake workingDir: 'build', arguments: '--build . --target package', installation: 'InSearchPath'
                         }
                     }
                     stage('Test') {
