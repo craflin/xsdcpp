@@ -297,10 +297,13 @@ private:
                     return false;
 
                 String name = getAttribute(element, "name");
+                uint minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
                 uint maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
 
-                if (maxOccurs == 1)
+                if (minOccurs == 1 && maxOccurs == 1)
                     attributes.append(typeInfo->cppName + " " + toCppIdentifier(name));
+                else if (minOccurs == 0 && maxOccurs == 1)
+                    attributes.append(String("std::unique_ptr<") + typeInfo->cppName + "> " + toCppIdentifier(name));
                 else
                     attributes.append(String("std::vector<") + typeInfo->cppName + "> " + toCppIdentifier(name));
             }
@@ -325,24 +328,49 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
 
     String rootName = getAttribute(*entryPoint, "name");
 
-    output.append(String("typedef ") + typeInfo->cppName + " " + rootName + ";");
+    output.append(String("typedef ") + typeInfo->cppName + " " + toCppIdentifier(rootName) + ";");
+    output.append("");
+    output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data);");
     output.append("");
 
     List<String> header;
     header.append("");
+    header.append("#pragma once");
+    header.append("");
     header.append("#include <cstdint>");
     header.append("#include <string>");
     header.append("#include <vector>");
+    header.append("#include <memory>");
     header.append("");
     output.prepend(header);
 
-    String outputFilePath = outputDir + "/" + rootName + ".hpp";
-    File outputFile;
-    if (!outputFile.open(outputFilePath, File::writeFlag))
-        return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+    {
+        String outputFilePath = outputDir + "/" + rootName + ".hpp";
+        File outputFile;
+        if (!outputFile.open(outputFilePath, File::writeFlag))
+            return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
-    for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
-        outputFile.write(*i + "\n");
+        for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
+            outputFile.write(*i + "\n");
+    }
+    {
+        String outputFilePath = outputDir + "/" + rootName + ".cpp";
+        File outputFile;
+        if (!outputFile.open(outputFilePath, File::writeFlag))
+            return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+
+        List<String> output;
+        output.append("");
+        output.append(String("#include \"") + rootName + ".hpp\"");
+        output.append("");
+        output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data)");
+        output.append("{");
+        output.append("}");
+        output.append("");
+
+        for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
+            outputFile.write(*i + "\n");
+    }
 
     return true;
 }
