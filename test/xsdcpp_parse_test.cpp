@@ -1,5 +1,5 @@
 
-#include "../src/Xsd.hpp"
+#include "../src/Reader.hpp"
 #include "../src/Generator.hpp"
 
 #include <nstd/Console.hpp>

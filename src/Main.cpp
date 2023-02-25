@@ -2,7 +2,7 @@
 #include <nstd/Process.hpp>
 #include <nstd/Console.hpp>
 
-#include "Xsd.hpp"
+#include "Reader.hpp"
 #include "Generator.hpp"
 
 void usage(const char* argv0)

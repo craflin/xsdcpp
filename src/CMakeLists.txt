@@ -1,7 +1,7 @@
 
 add_library(libxsdcpp STATIC
-    Xsd.cpp
-    Xsd.hpp
+    Reader.cpp
+    Reader.hpp
     Generator.cpp
     Generator.hpp
 )
