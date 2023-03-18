@@ -3,6 +3,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <cstdint>
 
 namespace {
 
@@ -241,7 +242,7 @@ std::string unescapeString(const char* str, size_t len)
             }
             if (*src == '#')
             {
-                uint unicodeValue;
+                uint32_t unicodeValue;
                 if (src[1] == 'x')
                     unicodeValue = strtoul(src + 2, nullptr, 16);
                 else

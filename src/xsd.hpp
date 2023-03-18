@@ -1,0 +1,142 @@
+
+#pragma once
+
+#include <cstdint>
+#include <new>
+#include <string>
+#include <utility>
+#include <vector>
+#include <type_traits>
+
+namespace xsd {
+
+typedef std::string string;
+
+template <typename T>
+using vector = std::vector<T>;
+
+template <typename T>
+class optional
+{
+public:
+    optional()
+        : _valid(false)
+    {
+    }
+    optional(const optional& other)
+        : _valid(other._valid)
+    {
+        if (_valid)
+            ::new (&_data) T(*(T*)&other._data);
+    }
+
+    optional(optional&& other)
+        : _valid(other._valid)
+    {
+        if (_valid)
+        {
+            ::new (&_data) T(std::move(*(T*)&other._data));
+            ((T*)&other._data)->~T();
+            other._valid = false;
+        }
+    }
+
+    optional(const T& other)
+        : _valid(true)
+    {
+        ::new (&_data) T(other);
+    }
+
+    optional(T&& other)
+        : _valid(true)
+    {
+        ::new (&_data) T(std::move(other));
+    }
+
+    ~optional()
+    {
+        if (_valid)
+            ((T*)&_data)->~T();
+    }
+
+    optional& operator=(const optional& other)
+    {
+        if (_valid != other._valid)
+        {
+            if (_valid)
+            {
+                ((T*)&_data)->~T();
+                _valid = false;
+            }
+            else
+            {
+                ::new (&_data) T(*(T*)&other._data);
+                _valid = true;
+            }
+        }
+        else if (_valid)
+            *(T*)&_data = *(T*)&other._data;
+        return *this;
+    }
+
+    optional& operator=(optional&& other)
+    {
+        if (_valid != other._valid)
+        {
+            if (_valid)
+            {
+                ((T*)&_data)->~T();
+                _valid = false;
+            }
+            else
+            {
+                ::new (&_data) T(std::move(*(T*)&other._data));
+                _valid = true;
+                ((T*)&other._data)->~T();
+                other._valid = false;
+            }
+        }
+        else if (_valid)
+        {
+            *(T*)&_data = std::move(*(T*)&other._data);
+            ((T*)&other._data)->~T();
+            other._valid = false;
+        }
+        return *this;
+    }
+
+    optional& operator=(const T& other)
+    {
+        if (_valid)
+            *(T*)&_data = other;
+        else
+        {
+            ::new (&_data) T(other);
+            _valid = true;
+        }
+        return *this;
+    }
+
+    optional& operator=(T&& other)
+    {
+        if (_valid)
+            *(T*)&_data = std::move(other);
+        else
+        {
+            ::new (&_data) T(std::move(other));
+            _valid = true;
+        }
+        return *this;
+    }
+
+    operator bool() const
+    {
+        return _valid;
+    }
+
+private:
+    std::aligned_storage_t<sizeof(T), std::alignment_of<T>::value> _data;
+    bool _valid;
+};
+
+}

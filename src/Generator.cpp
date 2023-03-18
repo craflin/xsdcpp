@@ -130,7 +130,7 @@ private:
         if (typeName == "xs:normalizedString" || typeName == "xs:string")
         {
             TypeInfo& typeInfo = _generatedTypes.append(typeName, TypeInfo());
-            typeInfo.cppName = "std::string";
+            typeInfo.cppName = "xsd::string";
             typeInfo_ = &typeInfo;
             return true;
         }
@@ -184,7 +184,7 @@ private:
                 }
                 else
                 {
-                    _output.append(String("typedef std::string ") + typeName + ";");
+                    _output.append(String("typedef xsd::string ") + typeName + ";");
                     _output.append("");
                 }
             }
@@ -305,9 +305,9 @@ private:
                 if (minOccurs == 1 && maxOccurs == 1)
                     attributes.append(typeInfo->cppName + " " + toCppIdentifier(name));
                 else if (minOccurs == 0 && maxOccurs == 1)
-                    attributes.append(String("std::unique_ptr<") + typeInfo->cppName + "> " + toCppIdentifier(name));
+                    attributes.append(String("xsd::optional<") + typeInfo->cppName + "> " + toCppIdentifier(name));
                 else
-                    attributes.append(String("std::vector<") + typeInfo->cppName + "> " + toCppIdentifier(name));
+                    attributes.append(String("xsd::vector<") + typeInfo->cppName + "> " + toCppIdentifier(name));
             }
         }
         return true;
@@ -339,7 +339,7 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     header.append("");
     header.append("#pragma once");
     header.append("");
-    header.append("#include \"xsdcpp.hpp\"");
+    header.append("#include \"xsd.hpp\"");
     header.append("");
     output.prepend(header);
 
@@ -372,11 +372,11 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     }
 
     {
-        String outputFilePath = outputDir + "/xsdcpp.hpp";
+        String outputFilePath = outputDir + "/xsd.hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
-        outputFile.write(xsdcpp_hpp);
+        outputFile.write(xsd_hpp);
     }
 
     return true;

@@ -3,8 +3,8 @@ add_subdirectory(ResourceCompiler)
 
 add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Resources.hpp"
-    COMMAND ResourceCompiler "${CMAKE_CURRENT_SOURCE_DIR}/xsdcpp.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/XmlParser.cpp" -o "${CMAKE_CURRENT_BINARY_DIR}/Resources.hpp"
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/xsdcpp.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/XmlParser.cpp" "$<TARGET_FILE:ResourceCompiler>"
+    COMMAND ResourceCompiler "${CMAKE_CURRENT_SOURCE_DIR}/xsd.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/XmlParser.cpp" -o "${CMAKE_CURRENT_BINARY_DIR}/Resources.hpp"
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/xsd.hpp" "${CMAKE_CURRENT_SOURCE_DIR}/XmlParser.cpp" "$<TARGET_FILE:ResourceCompiler>"
 )
 
 add_library(libxsdcpp STATIC
