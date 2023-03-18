@@ -6,6 +6,8 @@
 #include <nstd/File.hpp>
 #include <nstd/HashMap.hpp>
 
+#include <Resources.hpp>
+
 namespace {
 
 const Xml::Element* findElementByType(const Xml::Element& parent, const String& type)
@@ -337,10 +339,7 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     header.append("");
     header.append("#pragma once");
     header.append("");
-    header.append("#include <cstdint>");
-    header.append("#include <string>");
-    header.append("#include <vector>");
-    header.append("#include <memory>");
+    header.append("#include \"xsdcpp.hpp\"");
     header.append("");
     output.prepend(header);
 
@@ -370,6 +369,14 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
 
         for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
             outputFile.write(*i + "\n");
+    }
+
+    {
+        String outputFilePath = outputDir + "/xsdcpp.hpp";
+        File outputFile;
+        if (!outputFile.open(outputFilePath, File::writeFlag))
+            return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        outputFile.write(xsdcpp_hpp);
     }
 
     return true;
