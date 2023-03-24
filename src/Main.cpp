@@ -50,7 +50,7 @@ int main(int argc, char* argv[])
     }
 
     String error;
-    Xml::Element xsd;
+    Xsd xsd;
     if (!readXsd(inputFile, xsd, error) ||
         !generateCpp(xsd, outputDir, error))
     {

@@ -10,45 +10,6 @@
 
 namespace {
 
-const Xml::Element* findElementByType(const Xml::Element& parent, const String& type)
-{
-    for (List<Xml::Variant>::Iterator i = parent.content.begin(), end = parent.content.end(); i != end; ++i)
-    {
-        const Xml::Variant& variant = *i;
-        if (!variant.isElement())
-            continue;
-
-        const Xml::Element& element = variant.toElement();
-        if (element.type == type)
-            return &element;
-    }
-    return nullptr;
-}
-
-String getAttribute(const Xml::Element& element, const String& name, const String& defaultValue = String())
-{
-    HashMap<String, String>::Iterator it = element.attributes.find(name);
-    if (it == element.attributes.end())
-        return defaultValue;
-    return *it;
-}
-
-const Xml::Element* findElementByName(const Xml::Element& parent, const String& name)
-{
-    for (List<Xml::Variant>::Iterator i = parent.content.begin(), end = parent.content.end(); i != end; ++i)
-    {
-        const Xml::Variant& variant = *i;
-        if (!variant.isElement())
-            continue;
-
-        const Xml::Element& element = variant.toElement();
-
-        if (getAttribute(element, "name") == name)
-            return &element;
-    }
-    return nullptr;
-}
-
 String toCppIdentifier(const String& str)
 {
     String result = str;
@@ -63,13 +24,7 @@ String toCppIdentifier(const String& str)
 class Generator
 {
 public:
-    struct TypeInfo
-    {
-        String cppName;
-    };
-
-public:
-    Generator(const Xml::Element& xsd, List<String>& cppOutput, List<String>& hppOutput)
+    Generator(const Xsd& xsd, List<String>& cppOutput, List<String>& hppOutput)
         : _xsd(xsd)
         , _cppOutput(cppOutput)
         , _hppOutput(hppOutput)
@@ -78,265 +33,155 @@ public:
 
     const String& getError() const { return _error; }
 
-    bool processXsElement(const Xml::Element& element, const TypeInfo*& typeInfo)
+    bool process()
     {
-        return processXsElement(String("root_t"), element, typeInfo);
+        String cppName;
+        if (!processType(_xsd.rootType, cppName))
+            return false;
+
+        _hppOutput.append(String("typedef ") + cppName + " " + toCppIdentifier(_xsd.name) + ";");
+        _hppOutput.append("");
+        _hppOutput.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(_xsd.name) + "& data);");
+        _hppOutput.append("");
+        return true;
     }
 
 private:
-    const Xml::Element& _xsd;
+    const Xsd& _xsd;
     List<String>& _cppOutput;
     List<String>& _hppOutput;
-    HashMap<String, TypeInfo> _generatedTypes;
+    HashMap<String, String> _generatedTypes;
     String _error;
 
 private:
-    bool processXsElement(const String& parentTypeName, const Xml::Element& element, const TypeInfo*& typeInfo)
+    bool processType(const String& typeName, String& cppName)
     {
-        String typeName = getAttribute(element, "type");
-        String name = getAttribute(element, "name");
-
-        if (typeName.isEmpty())
-        { // inline type
-            typeName = parentTypeName + "_" + name + "_t";
-
-            for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
-            {
-                const Xml::Variant& variant = *i;
-                if (!variant.isElement())
-                    continue;
-                const Xml::Element& element = variant.toElement();
-                if (!processTypeElement(element, typeName, typeInfo))
-                    return false;
-                break;
-            }
-        }
-        else
-        {
-            const TypeInfo* _;
-            if (!generateType(typeName, typeInfo))
-                return false;
-        }
-        return true;
-    }
-
-    bool generateType(const String& typeName, const TypeInfo*& typeInfo_)
-    {
-        HashMap<String, TypeInfo>::Iterator it = _generatedTypes.find(typeName);
+        HashMap<String, String>::Iterator it = _generatedTypes.find(typeName);
         if (it != _generatedTypes.end())
         {
-            typeInfo_ = &*it;
+            cppName = *it;
             return true;
         }
 
-        if (typeName == "xs:normalizedString" || typeName == "xs:string")
+        HashMap<String, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        if (it2 == _xsd.types.end())
+            return _error = String::fromPrintf("Type '%s' not found", (const char*)typeName), false;
+        Xsd::Type& type = *it2;
+
+        if (type.kind == Xsd::Type::BaseKind)
         {
-            TypeInfo& typeInfo = _generatedTypes.append(typeName, TypeInfo());
-            typeInfo.cppName = "xsd::string";
-            typeInfo_ = &typeInfo;
+            if (typeName == "xs:normalizedString" || typeName == "xs:string")
+            {
+                cppName = "xsd::string";
+                _generatedTypes.append(typeName, cppName);
+                return true;
+            }
+
+            if (typeName == "xs:nonNegativeInteger" || typeName == "xs:positiveInteger")
+            {
+                cppName = "uint32_t";
+                _generatedTypes.append(typeName, cppName);
+                return true;
+            }
+
+            return _error = String::fromPrintf("Base type '%s' not supported", (const char*)typeName), false;
+        }
+
+        if (type.kind == Xsd::Type::SimpleBaseRefKind)
+        {
+            cppName = toCppIdentifier(typeName);
+            _generatedTypes.append(typeName, cppName);
+
+            String baseCppName;
+            if (!processType(type.baseType, baseCppName))
+                return false;
+
+            _hppOutput.append(String("typedef ") + baseCppName + " "  + cppName + ";");
+            _hppOutput.append("");
             return true;
         }
 
-        if (typeName == "xs:nonNegativeInteger" || typeName == "xs:positiveInteger")
+        if (type.kind == Xsd::Type::StringKind)
         {
-            TypeInfo& typeInfo = _generatedTypes.append(typeName, TypeInfo());
-            typeInfo.cppName = "uint32_t";
-            typeInfo_ = &typeInfo;
+            cppName = toCppIdentifier(typeName);
+            _generatedTypes.append(typeName, cppName);
+            _hppOutput.append(String("typedef xsd::string ") + cppName + ";");
+            _hppOutput.append("");
             return true;
         }
 
-        const Xml::Element* element = findElementByName(_xsd, typeName);
-        if (!element)
-            return (_error = String::fromPrintf("Could not find type '%s'", (const char*)typeName)), false;
-
-        return processTypeElement(*element, typeName, typeInfo_);
-    }
-
-    bool processTypeElement(const Xml::Element& element, const String& typeName, const TypeInfo*& typeInfo_)
-    {
-        if (element.type == "xs:simpleType")
+        if (type.kind == Xsd::Type::EnumKind)
         {
-            const Xml::Element* restriction = findElementByType(element, "xs:restriction");
-            if (!restriction)
-                return (_error = String::fromPrintf("Could not find 'xs:restriction' in '%s'", (const char*)typeName)), false;
-            String base = getAttribute(*restriction, "base");
+            cppName = toCppIdentifier(typeName);
+            _generatedTypes.append(typeName, cppName);
 
-            if (base == "xs:normalizedString")
-            {
-                List<String> enumValues;
-                for (List<Xml::Variant>::Iterator i = restriction->content.begin(), end = restriction->content.end(); i != end; ++i)
-                {
-                    const Xml::Variant& variant = *i;
-                    if (!variant.isElement())
-                        continue;
-                    const Xml::Element& element = variant.toElement();
-                    if (element.type != "xs:enumeration")
-                        continue;
-                    enumValues.append(toCppIdentifier(getAttribute(element, "value")));
-                }
-
-                if (!enumValues.isEmpty())
-                {
-                    _hppOutput.append(String("enum class ") + typeName);
-                    _hppOutput.append("{");
-                    for (List<String>::Iterator i = enumValues.begin(), end = enumValues.end(); i != end; ++i)
-                        _hppOutput.append(String("    ") + *i + ",");
-                    _hppOutput.append("};");
-                    _hppOutput.append("");
-                }
-                else
-                {
-                    _hppOutput.append(String("typedef xsd::string ") + typeName + ";");
-                    _hppOutput.append("");
-                }
-            }
-            else if (base == "xs:nonNegativeInteger")
-            {
-                _hppOutput.append(String("typedef uint32_t ") + typeName + ";");
-                _hppOutput.append("");
-            }
-            else
-                return (_error = String::fromPrintf("xs:restriction base '%s' not supported", (const char*)base)), false;
-        }
-
-        else if (element.type == "xs:complexType")
-        {
-            List<String> attributes;
-            const TypeInfo* baseTypeInfo = nullptr;
-
-            for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
-            {
-                const Xml::Variant& variant = *i;
-                if (!variant.isElement())
-                    continue;
-                const Xml::Element& element = variant.toElement();
-                if (element.type == "xs:attribute")
-                {
-                    if (!processXsAttribute(element, attributes))
-                        return false;
-                }
-                else if (element.type == "xs:all" || element.type == "xs:choice" || element.type == "xs:sequence")
-                {
-                    if (!processXsAllEtAl(typeName, element, attributes))
-                        return false;
-                }
-                else if (element.type == "xs:complexContent")
-                {
-                    for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
-                    {
-                        const Xml::Variant& variant = *i;
-                        if (!variant.isElement())
-                            continue;
-                        const Xml::Element& element = variant.toElement();
-                        if (element.type == "xs:extension")
-                        {
-                            String baseTypeName = getAttribute(element, "base");
-
-                            if (!generateType(baseTypeName, baseTypeInfo))
-                                return false;
-
-                            for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
-                            {
-                                const Xml::Variant& variant = *i;
-                                if (!variant.isElement())
-                                    continue;
-                                const Xml::Element& element = variant.toElement();
-                                if (element.type == "xs:attribute")
-                                {
-                                    if (!processXsAttribute(element, attributes))
-                                        return false;
-                                }
-                                else if (element.type == "xs:all" || element.type == "xs:choice" || element.type == "xs:sequence")
-                                {
-                                    if (!processXsAllEtAl(typeName, element, attributes))
-                                        return false;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (baseTypeInfo)
-                _hppOutput.append(String("struct ") + typeName + " : " + baseTypeInfo->cppName);
-            else
-                _hppOutput.append(String("struct ") + typeName);
+            _hppOutput.append(String("enum class ") + cppName);
             _hppOutput.append("{");
-            for (List<String>::Iterator i = attributes.begin(), end = attributes.end(); i != end; ++i)
+            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
+                _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
+            _hppOutput.append("};");
+            _hppOutput.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::ElementKind)
+        {
+            cppName = toCppIdentifier(typeName);
+            _generatedTypes.append(typeName, cppName);
+
+            String baseCppName;
+            if (!type.baseType.isEmpty())
+                if (!processType(type.baseType, baseCppName))
+                    return false;
+
+            List<String> structFields;
+            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+            {
+                const Xsd::AttributeRef& attributeRef = *i;
+                String attributeCppName;
+                if (!processType(attributeRef.typeName, attributeCppName))
+                    return false;
+                structFields.append(attributeCppName + " " + toCppIdentifier(attributeRef.name));
+            }
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                const Xsd::ElementRef& elementRef = *i;
+                String elementCppName;
+                if (!processType(elementRef.typeName, elementCppName))
+                    return false;
+                if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
+                    structFields.append(elementCppName + " " + toCppIdentifier(elementRef.name));
+                else if (elementRef.minOccurs == 0 && elementRef.maxOccurs == 1)
+                    structFields.append(String("xsd::optional<") + elementCppName + "> " + toCppIdentifier(elementRef.name));
+                else
+                    structFields.append(String("xsd::vector<") + elementCppName + "> " + toCppIdentifier(elementRef.name));
+            }
+
+            if (baseCppName.isEmpty())
+                _hppOutput.append(String("struct ") + cppName);
+            else
+                _hppOutput.append(String("struct ") + cppName + " : " + baseCppName);
+            _hppOutput.append("{");
+            for (List<String>::Iterator i = structFields.begin(), end = structFields.end(); i != end; ++i)
                 _hppOutput.append(String("    ") + *i + ";");
             _hppOutput.append("};");
             _hppOutput.append("");
+            return true;
         }
-        else
-            return (_error = String::fromPrintf("Element type '%s' not supported", (const char*)typeName)), false;
 
-        TypeInfo& typeInfo = _generatedTypes.append(typeName, TypeInfo());
-        typeInfo.cppName = toCppIdentifier(typeName);
-        typeInfo_ = &typeInfo;
-        return true;
-    }
-
-    bool processXsAttribute(const Xml::Element& element, List<String>& attributes)
-    {
-        String typeName = getAttribute(element, "type");
-        const TypeInfo* typeInfo = nullptr;
-        if (!generateType(typeName, typeInfo))
-            return false;
-        attributes.append(typeInfo->cppName + " " + toCppIdentifier(getAttribute(element, "name")));
-        return true;
-    }
-
-    bool processXsAllEtAl(const String& typeName, const Xml::Element& element, List<String>& attributes)
-    {
-        for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
-        {
-            const Xml::Variant& variant = *i;
-            if (!variant.isElement())
-                continue;
-            const Xml::Element& element = variant.toElement();
-            if (element.type == "xs:element")
-            {
-                const TypeInfo* typeInfo;
-                if (!processXsElement(typeName, element, typeInfo))
-                    return false;
-
-                String name = getAttribute(element, "name");
-                uint minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
-                uint maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
-
-                if (minOccurs == 1 && maxOccurs == 1)
-                    attributes.append(typeInfo->cppName + " " + toCppIdentifier(name));
-                else if (minOccurs == 0 && maxOccurs == 1)
-                    attributes.append(String("xsd::optional<") + typeInfo->cppName + "> " + toCppIdentifier(name));
-                else
-                    attributes.append(String("xsd::vector<") + typeInfo->cppName + "> " + toCppIdentifier(name));
-            }
-        }
-        return true;
+        return false; // logic error
     }
 };
 
 }
 
-bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error)
+bool generateCpp(const Xsd& xsd, const String& outputDir, String& error)
 {
-    const Xml::Element* entryPoint = findElementByType(xsd, "xs:element");
-    if (!entryPoint)
-        return (error = "Could not find 'xs:element' in root element"), false;
-
     List<String> cppOutput;
     List<String> hppOutput;
     Generator generator(xsd, cppOutput, hppOutput);
-    const Generator::TypeInfo* typeInfo = nullptr;
-    if (!generator.processXsElement(*entryPoint, typeInfo))
+    if (!generator.process())
         return (error = generator.getError()), false;
-
-    String rootName = getAttribute(*entryPoint, "name");
-
-    hppOutput.append(String("typedef ") + typeInfo->cppName + " " + toCppIdentifier(rootName) + ";");
-    hppOutput.append("");
-    hppOutput.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data);");
-    hppOutput.append("");
 
     List<String> header;
     header.append("");
@@ -347,7 +192,7 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     hppOutput.prepend(header);
 
     {
-        String outputFilePath = outputDir + "/" + rootName + ".hpp";
+        String outputFilePath = outputDir + "/" + xsd.name + ".hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
@@ -357,16 +202,16 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
     {
-        String outputFilePath = outputDir + "/" + rootName + ".cpp";
+        String outputFilePath = outputDir + "/" + xsd.name + ".cpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
         List<String> output;
         output.append("");
-        output.append(String("#include \"") + rootName + ".hpp\"");
+        output.append(String("#include \"") + xsd.name + ".hpp\"");
         output.append("");
-        output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data)");
+        output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(xsd.name) + "& data)");
         output.append("{");
         output.append("}");
         output.append("");

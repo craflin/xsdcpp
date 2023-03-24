@@ -3,4 +3,4 @@
 
 #include "Reader.hpp"
 
-bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error);
+bool generateCpp(const Xsd& xsd, const String& outputDir, String& error);
