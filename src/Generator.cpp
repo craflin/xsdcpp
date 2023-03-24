@@ -69,9 +69,10 @@ public:
     };
 
 public:
-    Generator(const Xml::Element& xsd, List<String>& output)
+    Generator(const Xml::Element& xsd, List<String>& cppOutput, List<String>& hppOutput)
         : _xsd(xsd)
-        , _output(output)
+        , _cppOutput(cppOutput)
+        , _hppOutput(hppOutput)
     {
     }
 
@@ -84,7 +85,8 @@ public:
 
 private:
     const Xml::Element& _xsd;
-    List<String>& _output;
+    List<String>& _cppOutput;
+    List<String>& _hppOutput;
     HashMap<String, TypeInfo> _generatedTypes;
     String _error;
 
@@ -175,23 +177,23 @@ private:
 
                 if (!enumValues.isEmpty())
                 {
-                    _output.append(String("enum class ") + typeName);
-                    _output.append("{");
+                    _hppOutput.append(String("enum class ") + typeName);
+                    _hppOutput.append("{");
                     for (List<String>::Iterator i = enumValues.begin(), end = enumValues.end(); i != end; ++i)
-                        _output.append(String("    ") + *i + ",");
-                    _output.append("};");
-                    _output.append("");
+                        _hppOutput.append(String("    ") + *i + ",");
+                    _hppOutput.append("};");
+                    _hppOutput.append("");
                 }
                 else
                 {
-                    _output.append(String("typedef xsd::string ") + typeName + ";");
-                    _output.append("");
+                    _hppOutput.append(String("typedef xsd::string ") + typeName + ";");
+                    _hppOutput.append("");
                 }
             }
             else if (base == "xs:nonNegativeInteger")
             {
-                _output.append(String("typedef uint32_t ") + typeName + ";");
-                _output.append("");
+                _hppOutput.append(String("typedef uint32_t ") + typeName + ";");
+                _hppOutput.append("");
             }
             else
                 return (_error = String::fromPrintf("xs:restriction base '%s' not supported", (const char*)base)), false;
@@ -256,14 +258,14 @@ private:
             }
 
             if (baseTypeInfo)
-                _output.append(String("struct ") + typeName + " : " + baseTypeInfo->cppName);
+                _hppOutput.append(String("struct ") + typeName + " : " + baseTypeInfo->cppName);
             else
-                _output.append(String("struct ") + typeName);
-            _output.append("{");
+                _hppOutput.append(String("struct ") + typeName);
+            _hppOutput.append("{");
             for (List<String>::Iterator i = attributes.begin(), end = attributes.end(); i != end; ++i)
-                _output.append(String("    ") + *i + ";");
-            _output.append("};");
-            _output.append("");
+                _hppOutput.append(String("    ") + *i + ";");
+            _hppOutput.append("};");
+            _hppOutput.append("");
         }
         else
             return (_error = String::fromPrintf("Element type '%s' not supported", (const char*)typeName)), false;
@@ -322,18 +324,19 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     if (!entryPoint)
         return (error = "Could not find 'xs:element' in root element"), false;
 
-    List<String> output;
-    Generator generator(xsd, output);
+    List<String> cppOutput;
+    List<String> hppOutput;
+    Generator generator(xsd, cppOutput, hppOutput);
     const Generator::TypeInfo* typeInfo = nullptr;
     if (!generator.processXsElement(*entryPoint, typeInfo))
         return (error = generator.getError()), false;
 
     String rootName = getAttribute(*entryPoint, "name");
 
-    output.append(String("typedef ") + typeInfo->cppName + " " + toCppIdentifier(rootName) + ";");
-    output.append("");
-    output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data);");
-    output.append("");
+    hppOutput.append(String("typedef ") + typeInfo->cppName + " " + toCppIdentifier(rootName) + ";");
+    hppOutput.append("");
+    hppOutput.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(rootName) + "& data);");
+    hppOutput.append("");
 
     List<String> header;
     header.append("");
@@ -341,7 +344,7 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
     header.append("");
     header.append("#include \"xsd.hpp\"");
     header.append("");
-    output.prepend(header);
+    hppOutput.prepend(header);
 
     {
         String outputFilePath = outputDir + "/" + rootName + ".hpp";
@@ -349,8 +352,9 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
-        for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
-            outputFile.write(*i + "\n");
+        for (List<String>::Iterator i = hppOutput.begin(), end = hppOutput.end(); i != end; ++i)
+            if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
     {
         String outputFilePath = outputDir + "/" + rootName + ".cpp";
@@ -367,8 +371,12 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
         output.append("}");
         output.append("");
 
+        if (!outputFile.write(XmlParser_cpp))
+            return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+
         for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
-            outputFile.write(*i + "\n");
+            if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
     {
@@ -376,7 +384,8 @@ bool generateCpp(const Xml::Element& xsd, const String& outputDir, String& error
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
-        outputFile.write(xsd_hpp);
+        if (!outputFile.write(xsd_hpp))
+            return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
     return true;
