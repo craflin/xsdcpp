@@ -35,14 +35,32 @@ public:
 
     bool process()
     {
-        String cppName;
-        if (!processType(_xsd.rootType, cppName))
+        String cppName = toCppIdentifier(_xsd.name);
+
+        _cppOutput.append("");
+        _cppOutput.append(String("#include \"") + cppName + ".hpp\"");
+        _cppOutput.append("");
+
+        _hppOutput.append("");
+        _hppOutput.append("#pragma once");
+        _hppOutput.append("");
+        _hppOutput.append("#include \"xsd.hpp\"");
+        _hppOutput.append("");
+
+        String rootTypeCppName;
+        if (!processType(_xsd.rootType, rootTypeCppName))
             return false;
 
-        _hppOutput.append(String("typedef ") + cppName + " " + toCppIdentifier(_xsd.name) + ";");
+        _hppOutput.append(String("typedef ") + rootTypeCppName + " " + cppName + ";");
         _hppOutput.append("");
-        _hppOutput.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(_xsd.name) + "& data);");
+        _hppOutput.append(String("void load_xml(const std::string& file, ") + cppName + "& data);");
         _hppOutput.append("");
+
+        _cppOutput.append(String("void load_xml(const std::string& file, ") + cppName + "& data)");
+        _cppOutput.append("{");
+        _cppOutput.append("}");
+        _cppOutput.append("");
+
         return true;
     }
 
@@ -96,7 +114,7 @@ private:
             if (!processType(type.baseType, baseCppName))
                 return false;
 
-            _hppOutput.append(String("typedef ") + baseCppName + " "  + cppName + ";");
+            _hppOutput.append(String("typedef ") + baseCppName + " " + cppName + ";");
             _hppOutput.append("");
             return true;
         }
@@ -166,6 +184,50 @@ private:
                 _hppOutput.append(String("    ") + *i + ";");
             _hppOutput.append("};");
             _hppOutput.append("");
+
+            /*
+                        void FileProducer_enter_element(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)
+                        {
+                            throwVerificationException(context.pos, "Unexpected element '" + name + "'");
+                        }
+
+                        void FileProducer_check(Context& context, ElementContext& elementContext)
+                        {
+                            if ((elementContext.processedElements & elementContext.info->mandatoryElements) != elementContext.info->mandatoryElements)
+                            { // an element was missing
+                            }
+                        }
+
+                        void FileProducer_set_attribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
+                        {
+                            if (name == "Identifier")
+                            {
+                                if (elementContext.processedAttributes & 1)
+                                    throwVerificationException(context.pos, "Attribute '" + name + "' was already set");
+                                elementContext.processedAttributes |= 1;
+                                ((root_type_FileProducer_t*)elementContext.element)->Identifier = value;
+                            }
+                            else if (name == "Comment")
+                            {
+                                if (elementContext.processedAttributes & 2)
+                                    throwVerificationException(context.pos, "Attribute '" + name + "' was already set");
+                                elementContext.processedAttributes |= 2;
+                                ((root_type_FileProducer_t*)elementContext.element)->Comment = value;
+                            }
+                            else
+                                throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
+                        }
+
+                        void FileProducer_check_attributes(Context& context, ElementContext& elementContext)
+                        {
+                            if ((elementContext.processedAttributes & elementContext.info->mandatoryAttributes) != elementContext.info->mandatoryAttributes)
+                            { // an attribute was missing
+                            }
+                        }
+                        const ElementInfo _FileProducer_Info = { &FileProducer_enter_element, &FileProducer_check, &FileProducer_set_attribute, &FileProducer_check_attributes, 0, 0 };
+
+            */
+
             return true;
         }
 
@@ -183,16 +245,10 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, String& error)
     if (!generator.process())
         return (error = generator.getError()), false;
 
-    List<String> header;
-    header.append("");
-    header.append("#pragma once");
-    header.append("");
-    header.append("#include \"xsd.hpp\"");
-    header.append("");
-    hppOutput.prepend(header);
+    String cppName = toCppIdentifier(xsd.name);
 
     {
-        String outputFilePath = outputDir + "/" + xsd.name + ".hpp";
+        String outputFilePath = outputDir + "/" + cppName + ".hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
@@ -201,25 +257,17 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, String& error)
             if (!outputFile.write(*i + "\n"))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
+
     {
-        String outputFilePath = outputDir + "/" + xsd.name + ".cpp";
+        String outputFilePath = outputDir + "/" + cppName + ".cpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
-        List<String> output;
-        output.append("");
-        output.append(String("#include \"") + xsd.name + ".hpp\"");
-        output.append("");
-        output.append(String("void load_xml(const std::string& file, ") + toCppIdentifier(xsd.name) + "& data)");
-        output.append("{");
-        output.append("}");
-        output.append("");
-
         if (!outputFile.write(XmlParser_cpp))
             return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
-        for (List<String>::Iterator i = output.begin(), end = output.end(); i != end; ++i)
+        for (List<String>::Iterator i = cppOutput.begin(), end = cppOutput.end(); i != end; ++i)
             if (!outputFile.write(*i + "\n"))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
