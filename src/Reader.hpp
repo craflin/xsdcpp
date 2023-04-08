@@ -52,4 +52,4 @@ struct Xsd
     String rootType;
 };
 
-bool readXsd(const String& file, Xsd& xsd, String& error);
+bool readXsd(const String& name, const String& file, Xsd& xsd, String& error);

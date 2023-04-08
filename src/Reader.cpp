@@ -2,6 +2,7 @@
 #include "Reader.hpp"
 
 #include <nstd/Document/Xml.hpp>
+#include <nstd/File.hpp>
 
 namespace {
 
@@ -55,8 +56,24 @@ public:
 
     const String& getError() const { return _error; }
 
-    bool process()
+    bool process(const String& name)
     {
+        List<Xsd::ElementRef> elements;
+        if (!processXsAllEtAl(String(), _xsd, elements))
+            return false;
+
+        String rootTypeName = name + "_t";
+
+        Xsd::Type& type = _output.types.append(rootTypeName, Xsd::Type());
+        type.kind = Xsd::Type::ElementKind;
+        //type.attributes.swap(attributes);
+        type.elements.swap(elements);
+
+
+        _output.name = name;
+        _output.rootType = rootTypeName;
+
+        /*
         const Xml::Element* entryPoint = findElementByType(_xsd, "xs:element");
         if (!entryPoint)
             return (_error = "Could not find 'xs:element' in root element"), false;
@@ -67,6 +84,7 @@ public:
 
         _output.rootType = typeName;
         _output.name = getAttribute(*entryPoint, "name");
+        */
         return true;
     }
 
@@ -284,15 +302,19 @@ private:
 
 }
 
-bool readXsd(const String& file, Xsd& xsd, String& error)
+bool readXsd(const String& name_, const String& file, Xsd& xsd, String& error)
 {
     Xml::Element xmlXsd;
     Xml::Parser parser;
     if (!parser.load(file, xmlXsd))
         return (error = String::fromPrintf("Could not load file '%s': %s", (const char*)parser.getErrorString())), false;
 
+    String name = name_;
+    if (name.isEmpty())
+        name = File::getStem(file);
+
     Reader reader(xmlXsd, xsd);
-    if (!reader.process())
+    if (!reader.process(name))
         return error = reader.getError(), false;
 
     return true;

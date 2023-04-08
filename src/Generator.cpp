@@ -41,6 +41,20 @@ public:
         _cppOutput.append(String("#include \"") + cppName + ".hpp\"");
         _cppOutput.append("");
 
+        _cppOutput.append("template <typename T>");
+        _cppOutput.append("T toType(const Position& pos, const std::string& value);");
+        _cppOutput.append("");
+        _cppOutput.append("template <>");
+        _cppOutput.append("uint32_t toType<uint32_t>(const Position& pos, const std::string& value)");
+        _cppOutput.append("{");
+        _cppOutput.append("    std::stringstream ss(value);");
+        _cppOutput.append("    uint32_t result;");
+        _cppOutput.append("    if (!(ss >> result))");
+        _cppOutput.append("         throwVerificationException(pos, \"Expected unsigned integer\");");
+        _cppOutput.append("    return result;");
+        _cppOutput.append("}");
+        _cppOutput.append("");
+
         _hppOutput.append("");
         _hppOutput.append("#pragma once");
         _hppOutput.append("");
@@ -48,16 +62,45 @@ public:
         _hppOutput.append("");
 
         String rootTypeCppName;
-        if (!processType(_xsd.rootType, rootTypeCppName))
+        if (!processType(_xsd.rootType, rootTypeCppName, 0))
             return false;
 
         _hppOutput.append(String("typedef ") + rootTypeCppName + " " + cppName + ";");
         _hppOutput.append("");
-        _hppOutput.append(String("void load_xml(const std::string& file, ") + cppName + "& data);");
+
+        _hppOutput.append(String("void load_file(const std::string& file, ") + cppName + "& data);");
+        _hppOutput.append(String("void load_content(const std::string& content, ") + cppName + "& data);");
         _hppOutput.append("");
 
-        _cppOutput.append(String("void load_xml(const std::string& file, ") + cppName + "& data)");
+        _cppOutput.append("");
+        _cppOutput.append("#include <fstream>");
+        _cppOutput.append("#include <system_error>");
+        _cppOutput.append("");
+
+        _cppOutput.append(String("void load_content(const std::string& content, ") + cppName + "& data)");
         _cppOutput.append("{");
+        _cppOutput.append("    ElementContext elementContext;");
+        _cppOutput.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
+        _cppOutput.append("    elementContext.element = &data;");
+        _cppOutput.append("    parse(content.c_str(), elementContext);");
+        _cppOutput.append("}");
+        _cppOutput.append("");
+
+        _cppOutput.append(String("void load_file(const std::string& filePath, ") + cppName + "& data)");
+        _cppOutput.append("{");
+        _cppOutput.append("    std::fstream file;");
+        _cppOutput.append("    file.exceptions(std::fstream::failbit | std::fstream::badbit);");
+        _cppOutput.append("    try");
+        _cppOutput.append("    {");
+        _cppOutput.append("        file.open(filePath, std::fstream::in);");
+        _cppOutput.append("    }");
+        _cppOutput.append("    catch (const std::exception&)");
+        _cppOutput.append("    {");
+        _cppOutput.append("        throw std::system_error(std::error_code(errno, std::system_category()));");
+        _cppOutput.append("    }");
+        _cppOutput.append("    std::stringstream buffer;");
+        _cppOutput.append("    buffer << file.rdbuf();");
+        _cppOutput.append("    load_content(buffer.str(), data);");
         _cppOutput.append("}");
         _cppOutput.append("");
 
@@ -72,7 +115,7 @@ private:
     String _error;
 
 private:
-    bool processType(const String& typeName, String& cppName)
+    bool processType(const String& typeName, String& cppName, usize level)
     {
         HashMap<String, String>::Iterator it = _generatedTypes.find(typeName);
         if (it != _generatedTypes.end())
@@ -111,7 +154,7 @@ private:
             _generatedTypes.append(typeName, cppName);
 
             String baseCppName;
-            if (!processType(type.baseType, baseCppName))
+            if (!processType(type.baseType, baseCppName, level + 1))
                 return false;
 
             _hppOutput.append(String("typedef ") + baseCppName + " " + cppName + ";");
@@ -139,6 +182,19 @@ private:
                 _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
             _hppOutput.append("};");
             _hppOutput.append("");
+
+            _cppOutput.append("template<>");
+            _cppOutput.append(cppName + " toType<" + cppName + ">(const Position& pos, const std::string& value)");
+            _cppOutput.append("{");
+            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
+            {
+                _cppOutput.append(String("    if (value == \"") + *i + "\")");
+                _cppOutput.append(String("        return ") + cppName + "::" + toCppIdentifier(*i) + ";");
+            }
+            _cppOutput.append("    throwVerificationException(pos, \"Unknown attribute value '\" + value + \"'\");");
+            _cppOutput.append(String("    return ") + cppName + "();");
+            _cppOutput.append("}");
+            _cppOutput.append("");
             return true;
         }
 
@@ -149,7 +205,7 @@ private:
 
             String baseCppName;
             if (!type.baseType.isEmpty())
-                if (!processType(type.baseType, baseCppName))
+                if (!processType(type.baseType, baseCppName, level + 1))
                     return false;
 
             List<String> structFields;
@@ -157,7 +213,7 @@ private:
             {
                 const Xsd::AttributeRef& attributeRef = *i;
                 String attributeCppName;
-                if (!processType(attributeRef.typeName, attributeCppName))
+                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
                     return false;
                 structFields.append(attributeCppName + " " + toCppIdentifier(attributeRef.name));
             }
@@ -165,7 +221,7 @@ private:
             {
                 const Xsd::ElementRef& elementRef = *i;
                 String elementCppName;
-                if (!processType(elementRef.typeName, elementCppName))
+                if (!processType(elementRef.typeName, elementCppName, level + 1))
                     return false;
                 if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
                     structFields.append(elementCppName + " " + toCppIdentifier(elementRef.name));
@@ -185,48 +241,114 @@ private:
             _hppOutput.append("};");
             _hppOutput.append("");
 
-            /*
-                        void FileProducer_enter_element(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)
-                        {
-                            throwVerificationException(context.pos, "Unexpected element '" + name + "'");
-                        }
+            _cppOutput.append(String("void ") + cppName + "_enter_element(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)");
+            _cppOutput.append("{");
 
-                        void FileProducer_check(Context& context, ElementContext& elementContext)
-                        {
-                            if ((elementContext.processedElements & elementContext.info->mandatoryElements) != elementContext.info->mandatoryElements)
-                            { // an element was missing
-                            }
-                        }
+            if (!type.elements.isEmpty())
+                _cppOutput.append(String("    ") + cppName + "& parentElement = *(" + cppName + "*)parentElementContext.element;");
 
-                        void FileProducer_set_attribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
-                        {
-                            if (name == "Identifier")
-                            {
-                                if (elementContext.processedAttributes & 1)
-                                    throwVerificationException(context.pos, "Attribute '" + name + "' was already set");
-                                elementContext.processedAttributes |= 1;
-                                ((root_type_FileProducer_t*)elementContext.element)->Identifier = value;
-                            }
-                            else if (name == "Comment")
-                            {
-                                if (elementContext.processedAttributes & 2)
-                                    throwVerificationException(context.pos, "Attribute '" + name + "' was already set");
-                                elementContext.processedAttributes |= 2;
-                                ((root_type_FileProducer_t*)elementContext.element)->Comment = value;
-                            }
-                            else
-                                throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
-                        }
+            uint elementIndex = 0; // todo: start with "baseElement.elements.size()" (must include further baseElements)
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i, ++elementIndex)
+            {
+                const Xsd::ElementRef& elementRef = *i;
+                String elementCppName;
+                if (!processType(elementRef.typeName, elementCppName, level + 1))
+                    return false;
+                _cppOutput.append(String("    if (name == \"") + elementRef.name + "\")");
+                _cppOutput.append("    {");
+                String elementBit = String::fromUInt64((uint64)1 << elementIndex) + "ULL";
 
-                        void FileProducer_check_attributes(Context& context, ElementContext& elementContext)
-                        {
-                            if ((elementContext.processedAttributes & elementContext.info->mandatoryAttributes) != elementContext.info->mandatoryAttributes)
-                            { // an attribute was missing
-                            }
-                        }
-                        const ElementInfo _FileProducer_Info = { &FileProducer_enter_element, &FileProducer_check, &FileProducer_set_attribute, &FileProducer_check_attributes, 0, 0 };
+                if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
+                {
+                    _cppOutput.append(String("        if (parentElementContext.processedElements & ") + elementBit + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than once\");");
+                    _cppOutput.append(String("        ") + elementCppName + "& element = parentElement." + toCppIdentifier(elementRef.name) + ";");
+                }
+                else if (elementRef.minOccurs == 0 && elementRef.maxOccurs == 1)
+                {
+                    _cppOutput.append(String("        if (parentElementContext.processedElements & ") + elementBit + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than once\");");
+                    _cppOutput.append(String("        parentElement.") + toCppIdentifier(elementRef.name) + " = " + elementCppName + "();");
+                    _cppOutput.append(String("        ") + elementCppName + "& element = *parentElement." + toCppIdentifier(elementRef.name) + ";");
+                }
+                else
+                {
+                    // todo : maxOccurs check
+                    if (elementRef.maxOccurs)
+                        _cppOutput.append(String("        if (parentElement.") + toCppIdentifier(elementRef.name) + ".size() > " + String::fromUInt(elementRef.maxOccurs) + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than " + String::fromUInt(elementRef.maxOccurs) + " times\");");
+                    _cppOutput.append(String("        parentElement.") + toCppIdentifier(elementRef.name) + ".emplace_back();");
+                    _cppOutput.append(String("        ") + elementCppName + "& element = parentElement." + toCppIdentifier(elementRef.name) + ".back();");
+                }
 
-            */
+                _cppOutput.append("        elementContext.element = &element;");
+                _cppOutput.append(String("        elementContext.info = &_") + elementCppName + "_Info;");
+                _cppOutput.append(String("        parentElementContext.processedElements |= ") + elementBit + ";");
+                _cppOutput.append("        return;");
+                _cppOutput.append("    }");
+            }
+            if (!baseCppName.isEmpty())
+                _cppOutput.append(String("    ") + baseCppName + "_enter_element(context, parentElementContext, name, elementContext);");
+            else
+                _cppOutput.append("    throwVerificationException(context.pos, \"Unexpected element '\" + name + \"'\");");
+            _cppOutput.append("}");
+            _cppOutput.append("");
+
+            _cppOutput.append(String("void ") + cppName + "_check(Context& context, ElementContext& elementContext)");
+            _cppOutput.append("{");
+            _cppOutput.append("    if ((elementContext.processedElements & elementContext.info->mandatoryElements) != elementContext.info->mandatoryElements)");
+            _cppOutput.append("    { // an element was missing");
+            _cppOutput.append("    }");
+            _cppOutput.append("}");
+            _cppOutput.append("");
+
+            _cppOutput.append(String("void ") + cppName + "_set_attribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)");
+            _cppOutput.append("{");
+
+            if (!type.attributes.isEmpty())
+                _cppOutput.append(String("    ") + cppName + "& element = *(" + cppName + "*)elementContext.element;");
+
+            uint attributeIndex = 0;  // todo: start with "baseElement.attributes.size()" (must include further baseElements)
+            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i, ++attributeIndex)
+            {
+                const Xsd::AttributeRef& attributeRef = *i;
+                String attributeCppName;
+                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
+                    return false;
+
+                HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
+                if (it == _xsd.types.end())
+                    return false;
+                Xsd::Type& type = *it;
+
+                _cppOutput.append(String("    if (name == \"") + attributeRef.name + "\")");
+                _cppOutput.append("    {");
+                if (attributeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
+                    _cppOutput.append(String("        element.") + toCppIdentifier(attributeRef.name) + " = value;");
+                else
+                    _cppOutput.append(String("        element.") + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName + ">(context.pos, value);");
+                _cppOutput.append("        return;");
+                _cppOutput.append("    }");
+            }
+            if (level == 1)
+            {
+                _cppOutput.append("    if (name == \"xmlns:xsi\" || name == \"xsi:noNamespaceSchemaLocation\")");
+                _cppOutput.append("        return;");
+            }
+            if (!baseCppName.isEmpty())
+                _cppOutput.append(String("    ") + baseCppName + "_set_attribute(context, elementContext, name, value);");
+            else
+                _cppOutput.append("    throwVerificationException(context.pos, \"Unexpected attribute '\" + name + \"'\");");
+            _cppOutput.append("}");
+            _cppOutput.append("");
+
+            _cppOutput.append(String("void ") + cppName + "_check_attributes(Context& context, ElementContext& elementContext)");
+            _cppOutput.append("{");
+            _cppOutput.append("    if ((elementContext.processedAttributes & elementContext.info->mandatoryAttributes) != elementContext.info->mandatoryAttributes)");
+            _cppOutput.append("    { // an attribute was missing");
+            _cppOutput.append("    }");
+            _cppOutput.append("}");
+            _cppOutput.append("");
+
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { &" + cppName + "_enter_element, &" + cppName + "_check, &" + cppName + "_set_attribute, &" + cppName + "_check_attributes, 0, 0 };");
+            _cppOutput.append("");
 
             return true;
         }

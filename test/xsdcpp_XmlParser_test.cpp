@@ -82,12 +82,12 @@ void ED247ComponentInstanceConfiguration_enter_element(Context& context, Element
 {
     if (name == "FileProducer")
     {
-        if (elementContext.processedElements & 1)
+        if (parentElementContext.processedElements & 1)
             throwVerificationException(context.pos, "Element '" + name + "' cannot occur more than once");
+        parentElementContext.processedElements |= 1;
 
         elementContext.info = &_FileProducer_Info;
         elementContext.element = &((ED247ComponentInstanceConfiguration*)parentElementContext.element)->FileProducer;
-        elementContext.processedElements |= 1;
     }
     else
         throwVerificationException(context.pos, "Unexpected element '" + name + "'");
@@ -133,12 +133,12 @@ void enter_root_element(Context& context, ElementContext& parentElementContext, 
 {
     if (name == "ED247ComponentInstanceConfiguration")
     {
-        if (elementContext.processedElements & 1)
+        if (parentElementContext.processedElements & 1)
             throwVerificationException(context.pos, "Element '" + name + "' cannot occur more than once");
+        parentElementContext.processedElements |= 1;
 
         elementContext.info = &_ED247ComponentInstanceConfiguration_Info;
         elementContext.element = parentElementContext.element;
-        elementContext.processedElements |= 1;
     }
     else
         throwSyntaxException(context.pos, "Unexpected element '" + name + "'");

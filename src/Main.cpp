@@ -7,16 +7,18 @@
 
 void usage(const char* argv0)
 {
-    Console::errorf("Usage: %s [<xsd-file>] [-o <output-dir>]\n", argv0);
+    Console::errorf("Usage: %s [<xsd-file>] [-o <output-dir>] [-n <schema-name>]\n", argv0);
 }
 
 int main(int argc, char* argv[])
 {
     String inputFile;
     String outputDir = ".";
+    String name;
     {
         Process::Option options[] = {
             {'o', "output", Process::argumentFlag},
+            {'n', "name", Process::argumentFlag},
             {'h', "help", Process::optionFlag},
             {1000, "version", Process::optionFlag},
         };
@@ -29,6 +31,8 @@ int main(int argc, char* argv[])
             case 'o':
                 outputDir = argument;
                 break;
+            case 'n':
+                name = argument;
             case ':':
                 Console::errorf("Option %s required an argument.\n", (const char*)argument);
                 return 1;
@@ -51,7 +55,7 @@ int main(int argc, char* argv[])
 
     String error;
     Xsd xsd;
-    if (!readXsd(inputFile, xsd, error) ||
+    if (!readXsd(name, inputFile, xsd, error) ||
         !generateCpp(xsd, outputDir, error))
     {
         Console::errorf("%s\n", (const char*)error);

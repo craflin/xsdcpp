@@ -11,7 +11,7 @@ int main()
     String error;
     Xsd xsd;
     if (!Directory::create("test_temp") ||
-        !readXsd(inputFile, xsd, error) ||
+        !readXsd(String(), inputFile, xsd, error) ||
         !generateCpp(xsd, "test_temp", error))
     {
         Console::errorf("%s\n", (const char*)error);

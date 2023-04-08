@@ -21,17 +21,16 @@ struct ElementInfo
     check_element_handler_t checkElementHandler;
     set_attribute_handler_t setAttributeHandler;
     check_attribute_handler_t checkAttributesHandler;
-    uint32_t mandatoryElements;
-    uint32_t mandatoryAttributes;
+    uint64_t mandatoryElements;
+    uint64_t mandatoryAttributes;
 };
 
 struct ElementContext
 {
     const ElementInfo* info;
     void* element;
-    //uint32_t expectedElements;
-    uint32_t processedElements;
-    uint32_t processedAttributes;
+    uint64_t processedElements;
+    uint64_t processedAttributes;
 
     ElementContext() : processedElements(0), processedAttributes(0) {}
 };

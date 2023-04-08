@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <new>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
-#include <type_traits>
 
 namespace xsd {
 
@@ -133,6 +133,11 @@ public:
     {
         return _valid;
     }
+
+    T& operator*() { return *(T*)&_data; }
+    const T& operator*() const { return *(T*)&_data; }
+    T& operator->() { return *(T*)&_data; }
+    const T& operator->() const { return *(T*)&_data; }
 
 private:
     std::aligned_storage_t<sizeof(T), std::alignment_of<T>::value> _data;
