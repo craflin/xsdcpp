@@ -1,17 +1,19 @@
 
 #include "ED247A_ECIC.hpp"
 
-int main()
-{
-    {
-        ED247A_ECIC ecic;
-        ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.emplace_back();
-        ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel[0].Streams.A429_Stream.emplace_back();
-        std::string& str = ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel[0].Streams.A429_Stream[0].Name;
-    }
+#include <gtest/gtest.h>
 
-    {
-        std::string xml = 
+TEST(Example, Constructor)
+{
+    ED247A_ECIC ecic;
+    ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.emplace_back();
+    ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel[0].Streams.A429_Stream.emplace_back();
+    std::string& str = ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel[0].Streams.A429_Stream[0].Name;
+}
+
+TEST(Example, load_content)
+{
+    std::string xml = 
 "<ED247ComponentInstanceConfiguration ComponentType=\"Virtual\" Name=\"VirtualComponent\" StandardRevision=\"A\" Identifier=\"0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:noNamespaceSchemaLocation=\"ED247A_ECIC.xsd\">"
 "    <Channels>"
 "        <MultiChannel Name=\"Channel0\">"
@@ -39,11 +41,8 @@ int main()
 "    </Channels>"
 "</ED247ComponentInstanceConfiguration>";
 
-        ED247A_ECIC ecic;
-        load_content(xml, ecic);
-
-    }
-
-
-    return 0;
+    ED247A_ECIC ecic;
+    load_content(xml, ecic);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.size(), 1);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Name, "Channel0");
 }

@@ -5,6 +5,10 @@ project(xsdcpp VERSION 0.1.0)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ".cmake")
 
+include(CDeploy)
+
+deploy_package(mingtest 0.1.9 "https://github.com/craflin/mingtest/releases/download/0.1.9")
+
 enable_testing()
 
 add_subdirectory(3rdparty)

@@ -2,6 +2,8 @@
 
 #include "../src/XmlParser.cpp"
 
+#include <gtest/gtest.h>
+
 struct root_type_FileProducer_t
 {
     std::string Identifier;
@@ -155,7 +157,7 @@ const ElementInfo _rootInfo = { &enter_root_element, &leave_root_element, nullpt
 
 }
 
-void load_xml_content(const std::string& content, ED247ComponentInstanceConfiguration& data)
+void load_content(const std::string& content, ED247ComponentInstanceConfiguration& data)
 {
     ElementContext elementContext;
     elementContext.info = &_rootInfo;
@@ -163,7 +165,7 @@ void load_xml_content(const std::string& content, ED247ComponentInstanceConfigur
     parse(content.c_str(), elementContext);
 }
 
-int main()
+TEST(XmlParser, parse)
 {
     ED247ComponentInstanceConfiguration config;
     std::string config_file_content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -172,14 +174,9 @@ int main()
                                       "    <FileProducer Identifier=\"123\"/>"
                                       "</ED247ComponentInstanceConfiguration>";
 
-    load_xml_content(config_file_content, config);
+    load_content(config_file_content, config);
 
-    if (config.FileProducer.Identifier != "123")
-        return 1;
-    if (config.Name != "VirtualComponent")
-        return 1;
-    if (config.StandardRevision != standard_revision_type::A)
-        return 1;
-
-    return 0;
+    EXPECT_EQ(config.FileProducer.Identifier, "123");
+    EXPECT_EQ(config.Name, "VirtualComponent");
+    EXPECT_EQ(config.StandardRevision, standard_revision_type::A);
 }
