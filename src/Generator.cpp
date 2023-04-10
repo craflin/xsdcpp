@@ -41,6 +41,10 @@ public:
         _cppOutput.append(String("#include \"") + cppName + ".hpp\"");
         _cppOutput.append("");
 
+        _cppOutput.append("namespace {");
+        _cppOutput.append("");
+
+
         _cppOutput.append("template <typename T>");
         _cppOutput.append("T toType(const Position& pos, const std::string& value);");
         _cppOutput.append("");
@@ -72,6 +76,8 @@ public:
         _hppOutput.append(String("void load_content(const std::string& content, ") + cppName + "& data);");
         _hppOutput.append("");
 
+        _cppOutput.append("");
+        _cppOutput.append("}");
         _cppOutput.append("");
         _cppOutput.append("#include <fstream>");
         _cppOutput.append("#include <system_error>");
