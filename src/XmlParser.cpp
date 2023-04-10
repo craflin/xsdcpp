@@ -10,13 +10,8 @@ namespace {
 struct Context;
 struct ElementContext;
 struct Position;
-
-//typedef void (*enter_element_handler_t)(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext);
-//typedef void (*check_element_handler_t)(Context& context, ElementContext& elementContext);
-//typedef void (*set_attribute_handler_t)(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value);
-//typedef void (*check_attribute_handler_t)(Context& context, ElementContext& elementContext);
-
 struct ElementInfo;
+
 typedef void* (*get_element_field_t)(void*);
 typedef void (*set_attribute_t)(void*, const Position&, const std::string& value);
 
@@ -40,10 +35,6 @@ struct ElementInfo
     const ElementInfo* base;
     uint64_t mandatoryChildren;
     uint64_t mandatoryAttributes;
-//    enter_element_handler_t enterElementHandler;
-    //check_element_handler_t checkElementHandler;
-    //set_attribute_handler_t setAttributeHandler;
-    //check_attribute_handler_t checkAttributesHandler;
 };
 
 struct ElementContext
