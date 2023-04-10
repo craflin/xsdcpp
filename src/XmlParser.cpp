@@ -9,20 +9,41 @@ namespace {
 
 struct Context;
 struct ElementContext;
+struct Position;
 
-typedef void (*enter_element_handler_t)(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext);
-typedef void (*check_element_handler_t)(Context& context, ElementContext& elementContext);
-typedef void (*set_attribute_handler_t)(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value);
-typedef void (*check_attribute_handler_t)(Context& context, ElementContext& elementContext);
+//typedef void (*enter_element_handler_t)(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext);
+//typedef void (*check_element_handler_t)(Context& context, ElementContext& elementContext);
+//typedef void (*set_attribute_handler_t)(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value);
+//typedef void (*check_attribute_handler_t)(Context& context, ElementContext& elementContext);
+
+struct ElementInfo;
+typedef void* (*get_element_field_t)(void*);
+typedef void (*set_attribute_t)(void*, const Position&, const std::string& value);
+
+struct ChildElementInfo
+{
+    const char* name;
+    get_element_field_t getElementField;
+    const ElementInfo* info;
+};
+
+struct AttributeInfo
+{
+    const char* name;
+    set_attribute_t setAttribute;
+};
 
 struct ElementInfo
 {
-    enter_element_handler_t enterElementHandler;
-    check_element_handler_t checkElementHandler;
-    set_attribute_handler_t setAttributeHandler;
-    check_attribute_handler_t checkAttributesHandler;
-    uint64_t mandatoryElements;
+    const ChildElementInfo* children;
+    const AttributeInfo* attributes;
+    const ElementInfo* base;
+    uint64_t mandatoryChildren;
     uint64_t mandatoryAttributes;
+//    enter_element_handler_t enterElementHandler;
+    //check_element_handler_t checkElementHandler;
+    //set_attribute_handler_t setAttributeHandler;
+    //check_attribute_handler_t checkAttributesHandler;
 };
 
 struct ElementContext
@@ -332,6 +353,41 @@ bool readToken(Context& context)
     }
 }
 
+void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)
+{
+    for (const ElementInfo* i = parentElementContext.info; i; i = i->base)
+        for (const ChildElementInfo* c = i->children; c->name; ++c)
+            if (name == c->name)
+            {
+                //parentElementContext.processedElements |= ??;
+                elementContext.element = c->getElementField(parentElementContext.element);
+                elementContext.info = c->info;
+                return;
+            }
+    throwVerificationException(context.pos, "Unexpected element '" + name + "'");
+}
+
+void checkElement(Context& context, const ElementContext& elementContext)
+{
+}
+
+void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
+{
+    for (const ElementInfo* i = elementContext.info; i; i = i->base)
+        for (const AttributeInfo* a = i->attributes; a->name; ++a)
+            if (name == a->name)
+            {
+                //elementContext.processedAttributes |= ??;
+                a->setAttribute(elementContext.element, context.pos, value);
+                return;
+            }
+    throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
+}
+
+void checkAttributes(Context& context, const ElementContext& elementContext)
+{
+}
+
 void parseElement(Context& context, ElementContext& parentElementContext)
 {
     // int line = context.token.pos.line;
@@ -341,14 +397,14 @@ void parseElement(Context& context, ElementContext& parentElementContext)
         throwSyntaxException(context.token.pos, "Expected tag name");
     std::string elementName = std::move(context.token.value);
     ElementContext elementContext;
-    parentElementContext.info->enterElementHandler(context, parentElementContext, elementName, elementContext);
+    enterElement(context, parentElementContext, elementName, elementContext);
     for (;;)
     {
         readToken(context);
         if (context.token.type == Token::emptyTagEndType)
         {
-            elementContext.info->checkAttributesHandler(context, elementContext);
-            elementContext.info->checkElementHandler(context, elementContext);
+            checkAttributes(context, elementContext);
+            checkElement(context, elementContext);
             return;
         }
         if (context.token.type == Token::tagEndType)
@@ -363,11 +419,11 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.token.type != Token::stringType)
                 throwSyntaxException(context.token.pos, "Expected string");
             const std::string& attributeValue = context.token.value;
-            elementContext.info->setAttributeHandler(context, elementContext, attributeName, attributeValue);
+            setAttribute(context, elementContext, attributeName, attributeValue);
             continue;
         }
     }
-    elementContext.info->checkAttributesHandler(context, elementContext);
+    checkAttributes(context, elementContext);
     for (;;)
     {
         skipText(context.pos);
@@ -391,7 +447,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     readToken(context);
     if (context.token.type != Token::tagEndType)
         throwSyntaxException(context.token.pos, "Expected '>'");
-    elementContext.info->checkElementHandler(context, elementContext);
+    checkElement(context, elementContext);
 }
 
 void parse(const char* data, ElementContext& elementContext)

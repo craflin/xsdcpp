@@ -90,14 +90,7 @@ public:
         _cppOutput.append("{");
         _cppOutput.append("    std::fstream file;");
         _cppOutput.append("    file.exceptions(std::fstream::failbit | std::fstream::badbit);");
-        _cppOutput.append("    try");
-        _cppOutput.append("    {");
-        _cppOutput.append("        file.open(filePath, std::fstream::in);");
-        _cppOutput.append("    }");
-        _cppOutput.append("    catch (const std::exception&)");
-        _cppOutput.append("    {");
-        _cppOutput.append("        throw std::system_error(std::error_code(errno, std::system_category()));");
-        _cppOutput.append("    }");
+        _cppOutput.append("    file.open(filePath, std::fstream::in);");
         _cppOutput.append("    std::stringstream buffer;");
         _cppOutput.append("    buffer << file.rdbuf();");
         _cppOutput.append("    load_content(buffer.str(), data);");
@@ -241,6 +234,68 @@ private:
             _hppOutput.append("};");
             _hppOutput.append("");
 
+
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                const Xsd::ElementRef& elementRef = *i;
+                String elementCppName;
+                if (!processType(elementRef.typeName, elementCppName, level + 1))
+                    return false;
+                if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
+                    _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return &parent->" + toCppIdentifier(elementRef.name) + ";}");
+                else if (elementRef.minOccurs == 0 && elementRef.maxOccurs == 1)
+                    _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return &*(parent->" + toCppIdentifier(elementRef.name) + " = " + elementCppName + "());}");
+                else
+                    _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return (parent->" + toCppIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppIdentifier(elementRef.name) + ".back());}");
+
+            }
+            _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                const Xsd::ElementRef& elementRef = *i;
+                String elementCppName;
+                if (!processType(elementRef.typeName, elementCppName, level + 1))
+                    return false;
+                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name)  + ", &_" + elementCppName + "_Info},");
+            }
+            _cppOutput.append("{}};");
+
+            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+            {
+                const Xsd::AttributeRef& attributeRef = *i;
+                String attributeCppName;
+                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
+                    return false;
+
+                HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
+                if (it == _xsd.types.end())
+                    return false;
+                Xsd::Type& type = *it;
+
+                if (attributeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
+                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position&, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = value; }");
+                else
+                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName +  ">(pos, value); }");
+            }
+            if (level == 1)
+                _cppOutput.append("void set_noop_attribute(void* element, const Position& pos, const std::string& value) {}");
+            _cppOutput.append(String("AttributeInfo _") + cppName + "_Attributes[] = {");
+            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+            {
+                const Xsd::AttributeRef& attributeRef = *i;
+                String attributeCppName;
+                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
+                    return false;
+                _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppIdentifier(attributeRef.name) + "},");
+            }
+            if (level == 1)
+            {
+                _cppOutput.append("    {\"xmlns:xsi\", &set_noop_attribute},");
+                _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &set_noop_attribute},");
+            }
+            _cppOutput.append("{}};");
+
+/*
             _cppOutput.append(String("void ") + cppName + "_enter_element(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)");
             _cppOutput.append("{");
 
@@ -346,8 +401,9 @@ private:
             _cppOutput.append("    }");
             _cppOutput.append("}");
             _cppOutput.append("");
+            */
 
-            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { &" + cppName + "_enter_element, &" + cppName + "_check, &" + cppName + "_set_attribute, &" + cppName + "_check_attributes, 0, 0 };");
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, _" + cppName + "_Attributes, " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") +  baseCppName + "_Info") + ", 0, 0 };");
             _cppOutput.append("");
 
             return true;
