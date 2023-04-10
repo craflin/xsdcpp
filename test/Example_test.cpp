@@ -30,7 +30,7 @@ TEST(Example, load_content)
 "                        <Signal Name=\"Signal01\" ByteOffset=\"1\"/>"
 "                    </Signals>"
 "                </DIS_Stream>"
-"                <DIS_Stream UID=\"1\" Name=\"Stream1\" Direction=\"Out\" SampleMaxSizeBytes=\"2\" SampleMaxNumber=\"10\">"
+"                <DIS_Stream UID=\"1\" Name=\"Stream1\" Direction=\"In\" SampleMaxSizeBytes=\"2\" SampleMaxNumber=\"10\">"
 "                    <Signals SamplingPeriodUs=\"10000\">"
 "                        <Signal Name=\"Signal10\" ByteOffset=\"0\"/>"
 "                        <Signal Name=\"Signal11\" ByteOffset=\"1\"/>"
@@ -58,4 +58,5 @@ TEST(Example, load_content)
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.front().SampleMaxSizeBytes, 2);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.front().SampleMaxNumber, 10);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.front().Signals.Signal.size(), 2);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream[1].Direction, direction_single_type::In);
 }

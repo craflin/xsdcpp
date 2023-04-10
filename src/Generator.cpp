@@ -44,6 +44,15 @@ public:
         _cppOutput.append("namespace {");
         _cppOutput.append("");
 
+        _cppOutput.append("uint32_t toType(const Position& pos, const char* const* values, const std::string& value)");
+        _cppOutput.append("{");
+        _cppOutput.append("    for (const char* const* i = values; *i; ++i)");
+        _cppOutput.append("        if (value == *i)");
+        _cppOutput.append("            return (uint32_t)(i - values);");
+        _cppOutput.append("    throwVerificationException(pos, \"Unknown attribute value '\" + value + \"'\");");
+        _cppOutput.append("    return 0;");
+        _cppOutput.append("}");
+        _cppOutput.append("");
 
         _cppOutput.append("template <typename T>");
         _cppOutput.append("T toType(const Position& pos, const std::string& value);");
@@ -182,17 +191,12 @@ private:
             _hppOutput.append("};");
             _hppOutput.append("");
 
-            _cppOutput.append("template<>");
-            _cppOutput.append(cppName + " toType<" + cppName + ">(const Position& pos, const std::string& value)");
-            _cppOutput.append("{");
+            _cppOutput.append(String("const char* _") + cppName + "_Values[] = {");
             for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-            {
-                _cppOutput.append(String("    if (value == \"") + *i + "\")");
-                _cppOutput.append(String("        return ") + cppName + "::" + toCppIdentifier(*i) + ";");
-            }
-            _cppOutput.append("    throwVerificationException(pos, \"Unknown attribute value '\" + value + \"'\");");
-            _cppOutput.append(String("    return ") + cppName + "();");
-            _cppOutput.append("}");
+                _cppOutput.append(String("    \"") + *i + "\",");
+            _cppOutput.append("    nullptr};");
+            _cppOutput.append("template<>");
+            _cppOutput.append(cppName + " toType<" + cppName + ">(const Position& pos, const std::string& value) {return (" + cppName + ")toType(pos, _" + cppName + "_Values, value);}");
             _cppOutput.append("");
             return true;
         }
@@ -240,7 +244,6 @@ private:
             _hppOutput.append("};");
             _hppOutput.append("");
 
-
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
                 const Xsd::ElementRef& elementRef = *i;
@@ -253,7 +256,6 @@ private:
                     _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return &*(parent->" + toCppIdentifier(elementRef.name) + " = " + elementCppName + "());}");
                 else
                     _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return (parent->" + toCppIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppIdentifier(elementRef.name) + ".back());}");
-
             }
             _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
@@ -262,9 +264,9 @@ private:
                 String elementCppName;
                 if (!processType(elementRef.typeName, elementCppName, level + 1))
                     return false;
-                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name)  + ", &_" + elementCppName + "_Info},");
+                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info},");
             }
-            _cppOutput.append("{}};");
+            _cppOutput.append("    {nullptr}\n};");
 
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
@@ -281,7 +283,7 @@ private:
                 if (attributeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position&, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = value; }");
                 else
-                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName +  ">(pos, value); }");
+                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName + ">(pos, value); }");
             }
             if (level == 1)
                 _cppOutput.append("void set_noop_attribute(void* element, const Position& pos, const std::string& value) {}");
@@ -299,117 +301,9 @@ private:
                 _cppOutput.append("    {\"xmlns:xsi\", &set_noop_attribute},");
                 _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &set_noop_attribute},");
             }
-            _cppOutput.append("{}};");
+            _cppOutput.append("    {nullptr}\n};");
 
-/*
-            _cppOutput.append(String("void ") + cppName + "_enter_element(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)");
-            _cppOutput.append("{");
-
-            if (!type.elements.isEmpty())
-                _cppOutput.append(String("    ") + cppName + "& parentElement = *(" + cppName + "*)parentElementContext.element;");
-
-            uint elementIndex = 0; // todo: start with "baseElement.elements.size()" (must include further baseElements)
-            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i, ++elementIndex)
-            {
-                const Xsd::ElementRef& elementRef = *i;
-                String elementCppName;
-                if (!processType(elementRef.typeName, elementCppName, level + 1))
-                    return false;
-                _cppOutput.append(String("    if (name == \"") + elementRef.name + "\")");
-                _cppOutput.append("    {");
-                String elementBit = String::fromUInt64((uint64)1 << elementIndex) + "ULL";
-
-                if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                {
-                    _cppOutput.append(String("        if (parentElementContext.processedElements & ") + elementBit + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than once\");");
-                    _cppOutput.append(String("        ") + elementCppName + "& element = parentElement." + toCppIdentifier(elementRef.name) + ";");
-                }
-                else if (elementRef.minOccurs == 0 && elementRef.maxOccurs == 1)
-                {
-                    _cppOutput.append(String("        if (parentElementContext.processedElements & ") + elementBit + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than once\");");
-                    _cppOutput.append(String("        parentElement.") + toCppIdentifier(elementRef.name) + " = " + elementCppName + "();");
-                    _cppOutput.append(String("        ") + elementCppName + "& element = *parentElement." + toCppIdentifier(elementRef.name) + ";");
-                }
-                else
-                {
-                    // todo : maxOccurs check
-                    if (elementRef.maxOccurs)
-                        _cppOutput.append(String("        if (parentElement.") + toCppIdentifier(elementRef.name) + ".size() > " + String::fromUInt(elementRef.maxOccurs) + ") throwVerificationException(context.pos, \"Element '\" + name + \"' cannot occur more than " + String::fromUInt(elementRef.maxOccurs) + " times\");");
-                    _cppOutput.append(String("        parentElement.") + toCppIdentifier(elementRef.name) + ".emplace_back();");
-                    _cppOutput.append(String("        ") + elementCppName + "& element = parentElement." + toCppIdentifier(elementRef.name) + ".back();");
-                }
-
-                _cppOutput.append("        elementContext.element = &element;");
-                _cppOutput.append(String("        elementContext.info = &_") + elementCppName + "_Info;");
-                _cppOutput.append(String("        parentElementContext.processedElements |= ") + elementBit + ";");
-                _cppOutput.append("        return;");
-                _cppOutput.append("    }");
-            }
-            if (!baseCppName.isEmpty())
-                _cppOutput.append(String("    ") + baseCppName + "_enter_element(context, parentElementContext, name, elementContext);");
-            else
-                _cppOutput.append("    throwVerificationException(context.pos, \"Unexpected element '\" + name + \"'\");");
-            _cppOutput.append("}");
-            _cppOutput.append("");
-
-            _cppOutput.append(String("void ") + cppName + "_check(Context& context, ElementContext& elementContext)");
-            _cppOutput.append("{");
-            _cppOutput.append("    if ((elementContext.processedElements & elementContext.info->mandatoryElements) != elementContext.info->mandatoryElements)");
-            _cppOutput.append("    { // an element was missing");
-            _cppOutput.append("    }");
-            _cppOutput.append("}");
-            _cppOutput.append("");
-
-            _cppOutput.append(String("void ") + cppName + "_set_attribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)");
-            _cppOutput.append("{");
-
-            if (!type.attributes.isEmpty())
-                _cppOutput.append(String("    ") + cppName + "& element = *(" + cppName + "*)elementContext.element;");
-
-            uint attributeIndex = 0;  // todo: start with "baseElement.attributes.size()" (must include further baseElements)
-            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i, ++attributeIndex)
-            {
-                const Xsd::AttributeRef& attributeRef = *i;
-                String attributeCppName;
-                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
-                    return false;
-
-                HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
-                if (it == _xsd.types.end())
-                    return false;
-                Xsd::Type& type = *it;
-
-                _cppOutput.append(String("    if (name == \"") + attributeRef.name + "\")");
-                _cppOutput.append("    {");
-                if (attributeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
-                    _cppOutput.append(String("        element.") + toCppIdentifier(attributeRef.name) + " = value;");
-                else
-                    _cppOutput.append(String("        element.") + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName + ">(context.pos, value);");
-                _cppOutput.append("        return;");
-                _cppOutput.append("    }");
-            }
-            if (level == 1)
-            {
-                _cppOutput.append("    if (name == \"xmlns:xsi\" || name == \"xsi:noNamespaceSchemaLocation\")");
-                _cppOutput.append("        return;");
-            }
-            if (!baseCppName.isEmpty())
-                _cppOutput.append(String("    ") + baseCppName + "_set_attribute(context, elementContext, name, value);");
-            else
-                _cppOutput.append("    throwVerificationException(context.pos, \"Unexpected attribute '\" + name + \"'\");");
-            _cppOutput.append("}");
-            _cppOutput.append("");
-
-            _cppOutput.append(String("void ") + cppName + "_check_attributes(Context& context, ElementContext& elementContext)");
-            _cppOutput.append("{");
-            _cppOutput.append("    if ((elementContext.processedAttributes & elementContext.info->mandatoryAttributes) != elementContext.info->mandatoryAttributes)");
-            _cppOutput.append("    { // an attribute was missing");
-            _cppOutput.append("    }");
-            _cppOutput.append("}");
-            _cppOutput.append("");
-            */
-
-            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, _" + cppName + "_Attributes, " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") +  baseCppName + "_Info") + ", 0, 0 };");
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, _" + cppName + "_Attributes, " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + ", 0, 0 };");
             _cppOutput.append("");
 
             return true;
