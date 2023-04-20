@@ -179,7 +179,7 @@ private:
         if (type.kind == Xsd::Type::EnumKind)
         {
             uint value = 0;
-            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
+            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i, ++value)
                 if (*i == defaultValue)
                     return String("(") + attributeTypeCppName + ")"  + String::fromUInt(value);
         }

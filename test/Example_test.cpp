@@ -47,9 +47,12 @@ TEST(Example, load_content)
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Name, "Channel0");
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().FrameFormat.StandardRevision, standard_revision_type::A);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.size(), 1);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().Direction, direction_bidir_type::InOut);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().DstIP, "224.1.1.1");
-    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().MulticastInterfaceIP, "127.0.0.1");
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().DstPort, 2589);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().MulticastInterfaceIP, "127.0.0.1");
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().MulticastTTL, 1);
+    EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().SrcIP, "");
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().ComInterface.UDP_Sockets.UDP_Socket.front().SrcPort, 1910);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.size(), 2);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.front().UID, 0);
