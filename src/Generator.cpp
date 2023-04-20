@@ -325,16 +325,21 @@ private:
                     _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return (parent->" + toCppIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppIdentifier(elementRef.name) + ".back());}");
             }
 
-            _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
-            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            String children("nullptr");
+            if (!type.elements.isEmpty())
             {
-                const Xsd::ElementRef& elementRef = *i;
-                String elementCppName;
-                if (!processType(elementRef.typeName, elementCppName, level + 1))
-                    return false;
-                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                children = String("_") + cppName + "_Children";
+                _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
+                for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+                {
+                    const Xsd::ElementRef& elementRef = *i;
+                    String elementCppName;
+                    if (!processType(elementRef.typeName, elementCppName, level + 1))
+                        return false;
+                    _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                }
+                _cppOutput.append("    {nullptr}\n};");
             }
-            _cppOutput.append("    {nullptr}\n};");
 
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
@@ -357,30 +362,35 @@ private:
                     _cppOutput.append(String("void default_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element) { element->" + toCppIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeTypeCppName, type, attributeRef.defaultValue) + "; }");
             }
             if (level == 1)
-            {
                 _cppOutput.append("void noop_set_attribute(void* element, const Position& pos, const std::string& value) {}");
-            }
-            _cppOutput.append(String("AttributeInfo _") + cppName + "_Attributes[] = {");
-            for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+
+            String attributes("nullptr");
+            if (!type.attributes.isEmpty() || level == 1)
             {
-                const Xsd::AttributeRef& attributeRef = *i;
-                String attributeCppName;
-                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
-                    return false;
-                String setDefault = (attributeRef.isMandatory || attributeRef.defaultValue.isEmpty()) ? String("nullptr") : String("(set_attribute_default_t)&default_") + cppName + "_" + toCppIdentifier(attributeRef.name);
-                _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppIdentifier(attributeRef.name) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                attributes = String("_") + cppName + "_Attributes";
+                _cppOutput.append(String("AttributeInfo _") + cppName + "_Attributes[] = {");
+                for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+                {
+                    const Xsd::AttributeRef& attributeRef = *i;
+                    String attributeCppName;
+                    if (!processType(attributeRef.typeName, attributeCppName, level + 1))
+                        return false;
+                    String setDefault = (attributeRef.isMandatory || attributeRef.defaultValue.isEmpty()) ? String("nullptr") : String("(set_attribute_default_t)&default_") + cppName + "_" + toCppIdentifier(attributeRef.name);
+                    _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppIdentifier(attributeRef.name) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                }
+                if (level == 1)
+                {
+                    _cppOutput.append("    {\"xmlns:xsi\", &noop_set_attribute, false, nullptr},");
+                    _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &noop_set_attribute, false, nullptr},");
+                }
+                _cppOutput.append("    {nullptr}\n};");
             }
-            if (level == 1)
-            {
-                _cppOutput.append("    {\"xmlns:xsi\", &noop_set_attribute, false, nullptr},");
-                _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &noop_set_attribute, false, nullptr},");
-            }
-            _cppOutput.append("    {nullptr}\n};");
 
             usize childrenCount = getChildrenCount(typeName);
             usize mandatoryChildrenCount = getMandatoryChildrenCount(typeName);
             uint64 attributesCount = getAttributesCount(typeName);
-            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) + ",  _" + cppName + "_Attributes, " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + " };");
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
+                + ",  " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + " };");
             _cppOutput.append("");
 
             return true;
