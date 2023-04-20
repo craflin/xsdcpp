@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <string>
 #include <cstdint>
+#include <unordered_map>
 
 namespace {
 
@@ -14,37 +15,43 @@ struct ElementInfo;
 
 typedef void* (*get_element_field_t)(void*);
 typedef void (*set_attribute_t)(void*, const Position&, const std::string& value);
+typedef void (*set_attribute_default_t)(void*);
 
 struct ChildElementInfo
 {
     const char* name;
     get_element_field_t getElementField;
     const ElementInfo* info;
+    size_t minOccurs;
+    size_t maxOccurs;
 };
 
 struct AttributeInfo
 {
     const char* name;
     set_attribute_t setAttribute;
+    bool isMandatory;
+    set_attribute_default_t setDefaultValue;
 };
 
 struct ElementInfo
 {
     const ChildElementInfo* children;
+    size_t childrenCount;
+    size_t mandatoryChildrenCount;
     const AttributeInfo* attributes;
+    size_t attributesCount;
     const ElementInfo* base;
-    uint64_t mandatoryChildren;
-    uint64_t mandatoryAttributes;
 };
 
 struct ElementContext
 {
     const ElementInfo* info;
     void* element;
-    uint64_t processedElements;
+    std::unordered_map<const ChildElementInfo*, size_t> processedElements;
     uint64_t processedAttributes;
 
-    ElementContext() : processedElements(0), processedAttributes(0) {}
+    ElementContext() : processedAttributes(0) {}
 };
 
 struct Position
@@ -350,9 +357,17 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
         for (const ChildElementInfo* c = i->children; c->name; ++c)
             if (name == c->name)
             {
-                //parentElementContext.processedElements |= ??;
+                size_t& count = parentElementContext.processedElements[c];
+                if (c->maxOccurs && count >= c->maxOccurs)
+                {
+                    std::stringstream s;
+                    s << "Maximum occurence of element '" << name << "' is " << c->maxOccurs ;
+                    throwVerificationException(context.pos,  s.str());
+                }
+                ++count;
                 elementContext.element = c->getElementField(parentElementContext.element);
                 elementContext.info = c->info;
+                elementContext.processedElements.reserve(c->info->childrenCount);
                 return;
             }
     throwVerificationException(context.pos, "Unexpected element '" + name + "'");
@@ -360,23 +375,54 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
 
 void checkElement(Context& context, const ElementContext& elementContext)
 {
+    if (elementContext.info->mandatoryChildrenCount)
+        for (const ElementInfo* i = elementContext.info; i; i = i->base)
+            for (const ChildElementInfo* c = i->children; c->name; ++c)
+            {
+                std::unordered_map<const ChildElementInfo*, size_t>::const_iterator it = elementContext.processedElements.find(c);
+                size_t count = it == elementContext.processedElements.end() ? 0 : it->second;
+                if (count < c->minOccurs)
+                {
+                    std::stringstream s;
+                    s << "Minimum occurence of element '" << c->name << "' is " << c->minOccurs ;
+                    throwVerificationException(context.pos, s.str());
+                }
+            }
 }
 
 void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
 {
+    uint64_t attribute = 1;
     for (const ElementInfo* i = elementContext.info; i; i = i->base)
-        for (const AttributeInfo* a = i->attributes; a->name; ++a)
+        for (const AttributeInfo* a = i->attributes; a->name; ++a, attribute <<= 1)
             if (name == a->name)
             {
-                //elementContext.processedAttributes |= ??;
+                if (elementContext.processedAttributes & attribute)
+                    throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
+                elementContext.processedAttributes |= attribute;
                 a->setAttribute(elementContext.element, context.pos, value);
                 return;
             }
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
-void checkAttributes(Context& context, const ElementContext& elementContext)
+void checkAttributes(Context& context, ElementContext& elementContext)
 {
+    uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
+    uint64_t missingAttributes = attributes & ~elementContext.processedAttributes;
+    if (missingAttributes)
+    {
+        uint64_t attribute = 1;
+        for (const ElementInfo* i = elementContext.info; i; i = i->base)
+            for (const AttributeInfo* a = i->attributes; a->name; ++a, attribute <<= 1)
+                if (missingAttributes & attribute)
+                {
+                    if (a->isMandatory)
+                        throwVerificationException(context.pos, "Missing attribute '" + std::string(a->name) + "'");
+                    if (a->setDefaultValue)
+                        a->setDefaultValue(elementContext.element);
+                }
+    }
 }
 
 void parseElement(Context& context, ElementContext& parentElementContext)

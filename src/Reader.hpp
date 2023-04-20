@@ -10,6 +10,7 @@ struct Xsd
     {
         String name;
         String typeName;
+        bool isMandatory;
         String defaultValue;
     };
 

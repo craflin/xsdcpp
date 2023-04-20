@@ -123,6 +123,73 @@ private:
     String _error;
 
 private:
+    usize getChildrenCount(const String& typeName)
+    {
+        if (typeName.isEmpty())
+            return 0;
+        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return 0;
+        const Xsd::Type& type = *it;
+        return type.elements.size() + getChildrenCount(type.baseType);
+    }
+
+    usize getMandatoryChildrenCount(const String& typeName)
+    {
+        if (typeName.isEmpty())
+            return 0;
+        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return 0;
+        const Xsd::Type& type = *it;
+        usize count = 0;
+        for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+        {
+            const Xsd::ElementRef& elementRef = *i;
+            if (elementRef.minOccurs)
+                ++count;
+        }
+        return count + getMandatoryChildrenCount(type.baseType);
+    }
+
+    usize getAttributesCount(const String& typeName)
+    {
+        if (typeName.isEmpty())
+            return 0;
+        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return 0;
+        const Xsd::Type& type = *it;
+        return type.attributes.size() + getAttributesCount(type.baseType);
+    }
+
+    String toCStringLiteral(const String& str)
+    {
+        String result;
+        result.reserve(str.length() + 4);
+        result.append("\"");
+        // todo: replace stuff
+        result.append(str);
+        result.append("\"");
+        return result;
+    }
+
+    String resolveDefaultValue(const String& attributeTypeCppName, const Xsd::Type& type, const String& defaultValue)
+    {
+        if (type.kind == Xsd::Type::EnumKind)
+        {
+            uint value = 0;
+            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
+                if (*i == defaultValue)
+                    return String("(") + attributeTypeCppName + ")"  + String::fromUInt(value);
+        }
+        if (attributeTypeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
+            return toCStringLiteral(defaultValue);
+        if (attributeTypeCppName == "uint32_t" || type.kind == Xsd::Type::SimpleBaseRefKind)
+            return defaultValue;
+        return "??";
+    }
+
     bool processType(const String& typeName, String& cppName, usize level)
     {
         HashMap<String, String>::Iterator it = _generatedTypes.find(typeName);
@@ -257,6 +324,7 @@ private:
                 else
                     _cppOutput.append(elementCppName + "* get_" + cppName + "_" + toCppIdentifier(elementRef.name) + "(" + cppName + "* parent) {return (parent->" + toCppIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppIdentifier(elementRef.name) + ".back());}");
             }
+
             _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
@@ -264,15 +332,15 @@ private:
                 String elementCppName;
                 if (!processType(elementRef.typeName, elementCppName, level + 1))
                     return false;
-                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info},");
+                _cppOutput.append(String("    {\"") + elementRef.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
             }
             _cppOutput.append("    {nullptr}\n};");
 
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
                 const Xsd::AttributeRef& attributeRef = *i;
-                String attributeCppName;
-                if (!processType(attributeRef.typeName, attributeCppName, level + 1))
+                String attributeTypeCppName;
+                if (!processType(attributeRef.typeName, attributeTypeCppName, level + 1))
                     return false;
 
                 HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
@@ -280,13 +348,18 @@ private:
                     return false;
                 Xsd::Type& type = *it;
 
-                if (attributeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
+                if (attributeTypeCppName == "xsd::string" || type.kind == Xsd::Type::StringKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position&, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = value; }");
                 else
-                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = toType<" + attributeCppName + ">(pos, value); }");
+                    _cppOutput.append(String("void set_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, const std::string& value) { element->" + toCppIdentifier(attributeRef.name) + " = toType<" + attributeTypeCppName + ">(pos, value); }");
+            
+                if (!attributeRef.isMandatory && !attributeRef.defaultValue.isEmpty())
+                    _cppOutput.append(String("void default_") + cppName + "_" + toCppIdentifier(attributeRef.name) + "(" + cppName + "* element) { element->" + toCppIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeTypeCppName, type, attributeRef.defaultValue) + "; }");
             }
             if (level == 1)
-                _cppOutput.append("void set_noop_attribute(void* element, const Position& pos, const std::string& value) {}");
+            {
+                _cppOutput.append("void noop_set_attribute(void* element, const Position& pos, const std::string& value) {}");
+            }
             _cppOutput.append(String("AttributeInfo _") + cppName + "_Attributes[] = {");
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
@@ -294,16 +367,20 @@ private:
                 String attributeCppName;
                 if (!processType(attributeRef.typeName, attributeCppName, level + 1))
                     return false;
-                _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppIdentifier(attributeRef.name) + "},");
+                String setDefault = (attributeRef.isMandatory || attributeRef.defaultValue.isEmpty()) ? String("nullptr") : String("(set_attribute_default_t)&default_") + cppName + "_" + toCppIdentifier(attributeRef.name);
+                _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppIdentifier(attributeRef.name) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
             }
             if (level == 1)
             {
-                _cppOutput.append("    {\"xmlns:xsi\", &set_noop_attribute},");
-                _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &set_noop_attribute},");
+                _cppOutput.append("    {\"xmlns:xsi\", &noop_set_attribute, false, nullptr},");
+                _cppOutput.append("    {\"xsi:noNamespaceSchemaLocation\", &noop_set_attribute, false, nullptr},");
             }
             _cppOutput.append("    {nullptr}\n};");
 
-            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, _" + cppName + "_Attributes, " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + ", 0, 0 };");
+            usize childrenCount = getChildrenCount(typeName);
+            usize mandatoryChildrenCount = getMandatoryChildrenCount(typeName);
+            uint64 attributesCount = getAttributesCount(typeName);
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { _" + cppName + "_Children, " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) + ",  _" + cppName + "_Attributes, " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + " };");
             _cppOutput.append("");
 
             return true;

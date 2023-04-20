@@ -271,7 +271,9 @@ private:
             return false;
         attribute.name = getAttribute(element, "name");
         attribute.typeName = typeName;
-        // todo: default value
+        String use = getAttribute(element, "use");
+        attribute.isMandatory = use == "required";
+        attribute.defaultValue = getAttribute(element, "default");
         return true;
     }
 
