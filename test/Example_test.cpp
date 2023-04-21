@@ -63,3 +63,11 @@ TEST(Example, load_content)
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream.front().Signals.Signal.size(), 2);
     EXPECT_EQ(ecic.ED247ComponentInstanceConfiguration.Channels.MultiChannel.front().Streams.DIS_Stream[1].Direction, direction_single_type::In);
 }
+
+// Double Attribute
+// Missing Attribute
+// Int Attribute out of range
+// Invalid Enum Attribute
+// Attribute not matching pattern
+// Too Many Elements
+// Missing Element

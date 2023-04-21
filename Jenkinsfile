@@ -15,9 +15,19 @@ pipeline {
                 stages {
                     stage('Build') {
                         steps {
-                            cmakeBuild buildDir: 'build', installation: 'InSearchPath', buildType: 'MinSizeRel', cmakeArgs: '-G Ninja'
-                            cmake workingDir: 'build', arguments: '--build .', installation: 'InSearchPath'
-                            //cmake workingDir: 'build', arguments: '--build . --target package', installation: 'InSearchPath'
+                            script {
+                                if (isUnix()) {
+                                    sh 'rm -rf build/xsdcpp-*.zip'
+                                }
+                                else {
+                                    bat 'if exist build\\xsdcpp-*.zip del build\\xsdcpp-*.zip'
+                                }
+                                cmakeBuild buildDir: 'build', installation: 'InSearchPath', buildType: 'MinSizeRel', cmakeArgs: '-G Ninja'
+                                cmake workingDir: 'build', arguments: '--build . --config MinSizeRel --target package', installation: 'InSearchPath'
+                                dir('build') {
+                                    archiveArtifacts artifacts: 'xsdcpp-*.zip'
+                                }
+                            }
                         }
                     }
                     stage('Test') {
