@@ -1,3 +1,6 @@
 [submodule "3rdparty/libnstd"]
 	path = 3rdparty/libnstd
 	url = ../libnstd.git
+[submodule "3rdparty/mingtest"]
+	path = 3rdparty/mingtest
+	url = ../mingtest.git

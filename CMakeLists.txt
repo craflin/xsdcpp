@@ -22,8 +22,6 @@ set(CDEPLOY_NO_COMPILER True)
 include(CDeploy)
 include(CPack)
 
-deploy_package(mingtest 0.1.9 "https://github.com/craflin/mingtest/releases/download/0.1.9")
-
 enable_testing()
 
 add_subdirectory(3rdparty)
