@@ -25,5 +25,5 @@ target_link_libraries(xsdcpp PUBLIC libxsdcpp)
 target_compile_definitions(xsdcpp PRIVATE "VERSION=\"${PROJECT_VERSION}\"")
 
 install(TARGETS xsdcpp
-    DESTINATION .
+    DESTINATION bin
 )
