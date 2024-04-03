@@ -22,7 +22,7 @@ String toCppTypeIdentifier(const String& str)
     }
     if (String::isDigit(*(char*)result))
         result.prepend("_");
-    if (result == "union" || result == "enum")
+    if (result == "union" || result == "enum" || result == "linux")
         result.append("_");
     return result;
 }

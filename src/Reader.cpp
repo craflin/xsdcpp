@@ -294,7 +294,7 @@ private:
         String nameWithoutPrefix;
         if (const char* x = name.find(':'))
         {
-            size_t n = x - (const char*)name;
+            usize n = x - (const char*)name;
             String namespacePrefix = name.substr(0, n);
             nameWithoutPrefix = name.substr(n + 1);
             HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(namespacePrefix);
