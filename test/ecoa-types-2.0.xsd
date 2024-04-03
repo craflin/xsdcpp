@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.ecoa.technology/types-2.0"
+  xmlns:tns="http://www.ecoa.technology/types-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://www.ecoa.technology/types-2.0">
+  <xsd:include schemaLocation="ecoa-common-2.0.xsd"/>
+  <xsd:simpleType name="E_basic">
+    <xsd:annotation>
+      <xsd:documentation>ECOA basic types</xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="boolean8"/>
+      <xsd:enumeration value="int8"/>
+      <xsd:enumeration value="int16"/>
+      <xsd:enumeration value="int32"/>
+      <xsd:enumeration value="int64"/>
+      <xsd:enumeration value="uint8"/>
+      <xsd:enumeration value="uint16"/>
+      <xsd:enumeration value="uint32"/>
+      <xsd:enumeration value="uint64"/>
+      <xsd:enumeration value="char8"/>
+      <xsd:enumeration value="byte"/>
+      <xsd:enumeration value="float32"/>
+      <xsd:enumeration value="double64"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="Simple">
+    <xsd:annotation>
+      <xsd:documentation>A type based on a predefined type (simple or
+        E_basic) with a name, min/max constraints, and a unit.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="minRange" type="ConstantReferenceOrValue"
+      use="optional"/>
+    <xsd:attribute name="maxRange" type="ConstantReferenceOrValue"
+      use="optional"/>
+    <xsd:attribute name="unit" type="xsd:string" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Use of International System units is
+          recommended.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="precision" type="ConstantReferenceOrValue"
+      use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Precision of values
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Constant">
+    <xsd:annotation>
+      <xsd:documentation>Constant definition</xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+    <xsd:attribute name="value" type="ConstantReferenceOrValue"
+      use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:simpleType name="ConstantValue">
+    <xsd:annotation>
+      <xsd:documentation>Type allowing inputs of decimal values and
+        character values
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:union
+      memberTypes="xsd:double xsd:integer CharConstantType HexaCharConstantType"/>
+  </xsd:simpleType>
+  <xsd:simpleType name="CharConstantType">
+    <xsd:annotation>
+      <xsd:documentation>Character Constant Type</xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="\p{IsBasicLatin}"/>
+      <xsd:length value="1"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="HexaCharConstantType">
+    <xsd:annotation>
+      <xsd:documentation>This type shall be used as the base type for
+        any XML schema attribute or element that contains a hex-encoded
+        char value.
+        This hex-encoded binary value contains the mandatory
+        string 0x followed by a sequence of 1 or 2 characters 0–9 and
+        a–f.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="0x[0-9A-Fa-f][0-9A-Fa-f]|0x[0-9A-Fa-f]"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="ConstantReferenceOrValue">
+    <xsd:annotation>
+      <xsd:documentation>Use of a constant reference or of any constant
+        value.
+        Note: the ConstantValue type is replaced by its flattened
+        union members.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:union
+      memberTypes="ConstantReference xsd:double xsd:integer CharConstantType HexaCharConstantType"/>
+  </xsd:simpleType>
+  <xsd:simpleType name="ConstantReference">
+    <xsd:annotation>
+      <xsd:documentation>Constant reference
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="%([A-Za-z][A-Za-z0-9_\.]*:)?[A-Za-z][A-Za-z0-9_]*%"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="ConstantReferenceOrPositiveIntegerValue">
+    <xsd:annotation>
+      <xsd:documentation>Use of a constant or of a positive integer
+        value.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern
+        value="%([A-Za-z][A-Za-z0-9_\.]*:)?[A-Za-z][A-Za-z0-9_]*%|[0-9]+"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:simpleType name="ConstantReferenceOrIntegerValue">
+    <xsd:annotation>
+      <xsd:documentation>Use of a constant or of an integer value.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern
+        value="%([A-Za-z][A-Za-z0-9_\.]*:)?[A-Za-z][A-Za-z0-9_]*%|(\+|-)?[0-9]*"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="Enum">
+    <xsd:annotation>
+      <xsd:documentation>Enumerated type</xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="value" type="EnumValue"/>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="EnumValue">
+    <xsd:annotation>
+      <xsd:documentation>A possible value of an enumerated type
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="valnum" type="ConstantReferenceOrIntegerValue"
+      use="optional"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="FixedArray">
+    <xsd:annotation>
+      <xsd:documentation>Fixed-size array (size is always equal to max
+        capacity)
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="itemType" type="TypeQName" use="required"/>
+    <xsd:attribute name="maxNumber"
+      type="ConstantReferenceOrPositiveIntegerValue" use="required"/>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Array">
+    <xsd:annotation>
+      <xsd:documentation>Variable-size (bounded capacity) array
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="itemType" type="TypeQName" use="required"/>
+    <xsd:attribute name="maxNumber"
+      type="ConstantReferenceOrPositiveIntegerValue" use="required"/>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Record">
+    <xsd:annotation>
+      <xsd:documentation>A record with named fields (Ada record, C
+        struct)
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="field" type="Field"/>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Field">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="VariantRecord">
+    <xsd:annotation>
+      <xsd:documentation>A record with variable parts: each "union"
+        exists only if the selector has the value given by the "when"
+        attribute.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="field"
+        type="Field"/>
+      <xsd:element maxOccurs="unbounded" name="union" type="Union"/>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="TypeName" use="required"/>
+    <xsd:attribute name="selectName" type="NameId" use="required"/>
+    <xsd:attribute name="selectType" type="TypeQName" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Union">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+    <xsd:attribute name="when" type="xsd:string" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="DataTypes">
+    <xsd:annotation>
+      <xsd:documentation>A set of data type definitions
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:choice maxOccurs="unbounded" minOccurs="0">
+      <xsd:element name="simple" type="Simple"/>
+      <xsd:element name="record" type="Record">
+        <xsd:unique name="field">
+          <xsd:selector xpath="tns:field"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+      <xsd:element name="constant" type="Constant"/>
+      <xsd:element name="variantRecord" type="VariantRecord">
+        <xsd:unique name="fieldunion">
+          <xsd:selector xpath="tns:field|tns:union"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+      <xsd:element name="array" type="Array"/>
+      <xsd:element name="fixedArray" type="FixedArray"/>
+      <xsd:element name="enum" type="Enum">
+        <xsd:unique name="value">
+          <xsd:selector xpath="tns:value"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+        <xsd:unique name="valnum">
+          <xsd:selector xpath="tns:value"/>
+          <xsd:field xpath="@valnum"/>
+        </xsd:unique>
+      </xsd:element>
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType name="Library">
+    <xsd:annotation>
+      <xsd:documentation>A set of data types in a library
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" ref="use"/>
+      <xsd:element name="types" type="DataTypes">
+        <xsd:unique name="typename">
+          <xsd:selector xpath="*"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:element name="library" type="Library"/>
+</xsd:schema>

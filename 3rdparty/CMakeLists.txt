@@ -30,3 +30,7 @@ endmacro()
 add_subdirectory(libnstd)
 add_subdirectory(mingtest)
 
+set_target_properties(nstd nstdCrypto nstdDocument nstdSocket gtest gtest_main
+    PROPERTIES
+        FOLDER   "3rdparty"
+)

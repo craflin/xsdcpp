@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Copyright(C) OASIS(R) 2005,2010. All Rights Reserved. OASIS trademark, IPR and other policies apply. -->
+<!-- This file is a derivative work of the original OASIS XSD file: -->
+<!-- sca-1.1-cd06.xsd -->
+<!-- In that sense, ECOA is not fully compliant with the OASIS SCA specification. -->
+<!-- This file is provided to help users to check more easily their ECOA XML files. -->
+<!-- Other verification means may be used. -->
+
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:sca="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+  targetNamespace="http://docs.oasis-open.org/ns/opencsa/sca/200912">
+
+  <include schemaLocation="sca-implementation-composite-1.1-cd06-subset-2.0.xsd"/>
+  <include schemaLocation="sca-core-1.1-cd06-subset-2.0.xsd"/>
+
+  <include schemaLocation="sca-contribution-1.1-cd06-subset-2.0.xsd"/>
+
+</schema>

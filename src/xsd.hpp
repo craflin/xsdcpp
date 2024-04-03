@@ -129,15 +129,12 @@ public:
         return *this;
     }
 
-    operator bool() const
-    {
-        return _valid;
-    }
+    operator bool() const { return _valid; }
 
     T& operator*() { return *(T*)&_data; }
     const T& operator*() const { return *(T*)&_data; }
-    T& operator->() { return *(T*)&_data; }
-    const T& operator->() const { return *(T*)&_data; }
+    T* operator->() { return (T*)&_data; }
+    const T* operator->() const { return (T*)&_data; }
 
 private:
     std::aligned_storage_t<sizeof(T), std::alignment_of<T>::value> _data;

@@ -36,6 +36,13 @@ struct AttributeInfo
 
 struct ElementInfo
 {
+    enum ElementFlag
+    {
+        Level1Flag = 0x01,
+        ReadTextFlag = 0x02
+    };
+    
+    size_t flags;
     const ChildElementInfo* children;
     size_t childrenCount;
     size_t mandatoryChildrenCount;
@@ -337,32 +344,40 @@ bool readToken(Context& context)
         }
         // no break
     default: // attribute or tag name
-    {
-        const char* end = context.pos.pos;
-        while (*end && *end != '/' && *end != '>' && *end != '=' && !isspace(*end))
-            ++end;
-        if (end == context.pos.pos)
-            throwSyntaxException(context.pos, "Expected name");
-        context.token.value = std::string(context.pos.pos, end - context.pos.pos);
-        context.token.type = Token::nameType;
-        context.pos.pos = end;
-        return true;
-    }
+        {
+            const char* end = context.pos.pos;
+            while (*end && *end != '/' && *end != '>' && *end != '=' && !isspace(*end))
+                ++end;
+            if (end == context.pos.pos)
+                throwSyntaxException(context.pos, "Expected name");
+            context.token.value = std::string(context.pos.pos, end - context.pos.pos);
+            context.token.type = Token::nameType;
+            context.pos.pos = end;
+            return true;
+        }
     }
 }
 
-void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)
+void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name_, ElementContext& elementContext)
 {
+    std::string nameWithoutNamespace;
+    const std::string* name = &name_;
+    size_t n = name_.find(':');
+    if (n != std::string::npos)
+    {
+        nameWithoutNamespace = name_.substr(n + 1);
+        name = &nameWithoutNamespace;
+    }
     for (const ElementInfo* i = parentElementContext.info; i; i = i->base)
         if (const ChildElementInfo* c = i->children)
             for (; c->name; ++c)
-                if (name == c->name)
+                if (*name == c->name)
                 {
                     size_t& count = parentElementContext.processedElements[c];
                     if (c->maxOccurs && count >= c->maxOccurs)
                     {
                         std::stringstream s;
-                        s << "Maximum occurence of element '" << name << "' is " << c->maxOccurs ;
+                        s << "Maximum occurrence of element '" << *name << "' is " << c->maxOccurs ;
                         throwVerificationException(context.pos,  s.str());
                     }
                     ++count;
@@ -371,7 +386,7 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
                     elementContext.processedElements.reserve(c->info->childrenCount);
                     return;
                 }
-    throwVerificationException(context.pos, "Unexpected element '" + name + "'");
+    throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
 }
 
 void checkElement(Context& context, const ElementContext& elementContext)
@@ -386,13 +401,13 @@ void checkElement(Context& context, const ElementContext& elementContext)
                     if (count < c->minOccurs)
                     {
                         std::stringstream s;
-                        s << "Minimum occurence of element '" << c->name << "' is " << c->minOccurs ;
+                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs ;
                         throwVerificationException(context.pos, s.str());
                     }
                 }
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
+void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, std::string&& value)
 {
     uint64_t attribute = 1;
     for (const ElementInfo* i = elementContext.info; i; i = i->base)
@@ -403,10 +418,21 @@ void setAttribute(Context& context, ElementContext& elementContext, const std::s
                     if (elementContext.processedAttributes & attribute)
                         throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
                     elementContext.processedAttributes |= attribute;
-                    a->setAttribute(elementContext.element, context.pos, value);
+                    a->setAttribute(elementContext.element, context.pos, std::move(value));
                     return;
                 }
+    if (elementContext.info->flags & ElementInfo::Level1Flag && (name.find(':') != std::string::npos || name == "xmlns"))
+        return;
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
+}
+
+void addText(Context& context, ElementContext& elementContext, std::string&& text)
+{
+    std::string& element = *(std::string*)elementContext.element;
+    if (element.empty())
+        element = std::move(text);
+    else
+        element += text;
 }
 
 void checkAttributes(Context& context, ElementContext& elementContext)
@@ -431,8 +457,6 @@ void checkAttributes(Context& context, ElementContext& elementContext)
 
 void parseElement(Context& context, ElementContext& parentElementContext)
 {
-    // int line = context.token.pos.line;
-    // int column = (int)(context.token.pos.pos - context.token.pos.lineStart) + 1;
     readToken(context);
     if (context.token.type != Token::nameType)
         throwSyntaxException(context.token.pos, "Expected tag name");
@@ -459,15 +483,22 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             readToken(context);
             if (context.token.type != Token::stringType)
                 throwSyntaxException(context.token.pos, "Expected string");
-            const std::string& attributeValue = context.token.value;
-            setAttribute(context, elementContext, attributeName, attributeValue);
+            std::string& attributeValue = context.token.value;
+            setAttribute(context, elementContext, attributeName, std::move(attributeValue));
             continue;
         }
     }
     checkAttributes(context, elementContext);
     for (;;)
     {
+        const char* start = context.pos.pos;
         skipText(context.pos);
+        if (context.pos.pos != start && elementContext.info->flags & ElementInfo::ReadTextFlag)
+        {
+            std::string text(start, context.pos.pos - start);
+            addText(context, elementContext, std::move(text));
+        }
+        
         Position pos = context.pos;
         readToken(context);
         if (context.token.type == Token::endTagBeginType)
@@ -478,7 +509,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             continue;
         }
         else
-            throwSyntaxException(context.token.pos, "Expected string");
+            throwSyntaxException(context.token.pos, "Expected '<'");
     }
     readToken(context);
     if (context.token.type != Token::nameType)
@@ -498,7 +529,7 @@ void parse(const char* data, ElementContext& elementContext)
     context.pos.line = 1;
     
     skipSpace(context.pos);
-    if (*context.pos.pos == '<' && context.pos.pos[1] == '?')
+    while (*context.pos.pos == '<' && context.pos.pos[1] == '?')
     {
         context.pos.pos += 2;
         for (;;)
@@ -514,6 +545,7 @@ void parse(const char* data, ElementContext& elementContext)
             context.pos.pos = end + 1;
             skipSpace(context.pos);
         }
+        skipSpace(context.pos);
     }
     readToken(context);
     if (context.token.type != Token::startTagBeginType)

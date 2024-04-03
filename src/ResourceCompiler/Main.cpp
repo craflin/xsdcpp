@@ -37,7 +37,12 @@ bool compileResources(const List<String>& inputFilePaths, const String& outputFi
 
         data.replace("\\", "\\\\");
         data.replace("\"", "\\\"");
+        data.replace("\r", "");
+#ifdef _WIN32
         data.replace("\n", "\\n\"\n\"");
+#else
+        data.replace("\n", "\\n\"\r\n\"");
+#endif
 
         if (!outputFile.write(String("static String ") + name + " = \"") || !outputFile.write(data) || !outputFile.write("\";\n"))
             return (error = Error::getErrorString()), false;

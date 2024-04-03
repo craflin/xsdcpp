@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.ecoa.technology/logicalsystem-2.0"
+  xmlns:tns="http://www.ecoa.technology/logicalsystem-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://www.ecoa.technology/logicalsystem-2.0">
+  <xsd:include schemaLocation="ecoa-common-2.0.xsd" />
+
+  <xsd:element name="logicalSystem" type="LogicalSystem">
+    <xsd:key name="platformIdKey">
+      <xsd:selector xpath="./logicalComputingPlatform" />
+      <xsd:field xpath="@id" />
+    </xsd:key>
+    <xsd:unique name="ELIPlatformIdKey">
+      <xsd:selector xpath="./logicalComputingPlatform" />
+      <xsd:field xpath="@ELIPlatformId" />
+    </xsd:unique>
+  </xsd:element>
+  <xsd:complexType name="LogicalSystem">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="logicalComputingPlatform"
+        type="LogicalComputingPlatform">
+        <xsd:key name="nodeIdKey">
+          <xsd:selector xpath="./logicalComputingNode" />
+          <xsd:field xpath="@id" />
+        </xsd:key>
+      </xsd:element>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="logicalComputingPlatformLinks" type="LogicalComputingPlatformLinks">
+        <xsd:unique name="computingPlatformLinkIdKey">
+          <xsd:selector xpath="./link" />
+          <xsd:field xpath="@id" />
+        </xsd:unique>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id" type="NameId" use="required" />
+  </xsd:complexType>
+
+  <xsd:complexType name="LogicalComputingPlatform">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="logicalComputingNode">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="endianess">
+              <xsd:complexType>
+                <xsd:attribute name="type" use="required">
+                  <xsd:simpleType>
+                    <xsd:restriction base="xsd:string">
+                      <xsd:enumeration value="BIG" />
+                      <xsd:enumeration value="LITTLE" />
+                    </xsd:restriction>
+                  </xsd:simpleType>
+                </xsd:attribute>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element maxOccurs="unbounded" name="logicalProcessors">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element name="stepDuration">
+                    <xsd:complexType>
+                      <xsd:attribute name="nanoSeconds" type="xsd:integer"
+                        use="required" />
+                    </xsd:complexType>
+                  </xsd:element>
+                </xsd:sequence>
+                <xsd:attribute name="type" type="xsd:string" use="required" />
+                <xsd:attribute name="number" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="os">
+              <xsd:complexType>
+                <xsd:attribute name="name" use="required">
+                  <xsd:simpleType>
+                    <xsd:restriction base="xsd:string">
+                      <xsd:enumeration value="fastos" />
+                      <xsd:enumeration value="linux" />
+                      <xsd:enumeration value="ima-integrity" />
+                      <xsd:enumeration value="ims-vxworks" />
+                      <xsd:enumeration value="integrity" />
+                      <xsd:enumeration value="pikeos" />
+                      <xsd:enumeration value="rtems" />
+                      <xsd:enumeration value="vxworks" />
+                      <xsd:enumeration value="vxworks-arinc653" />
+                      <xsd:enumeration value="vxworks-cert" />
+                      <xsd:enumeration value="windows" />
+                      <xsd:enumeration value="zephyr" />
+                    </xsd:restriction>
+                  </xsd:simpleType>
+                </xsd:attribute>
+                <xsd:attribute name="version" type="xsd:string"
+                  use="optional" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="availableMemory">
+              <xsd:complexType>
+                <xsd:attribute name="gigaBytes" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="moduleSwitchTime">
+              <xsd:complexType>
+                <xsd:attribute name="microSeconds" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+          <xsd:attribute name="id" type="xsd:string" use="required" />
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="logicalComputingNodeLinks" type="LogicalComputingNodeLinks">
+        <xsd:unique name="nodeLinkIdKey">
+          <xsd:selector xpath="./link" />
+          <xsd:field xpath="@id" />
+          <xsd:field xpath="@to" />
+          <xsd:field xpath="@from" />
+        </xsd:unique>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id" type="NameId" use="required" />
+    <xsd:attribute name="ELIPlatformId" type="xsd:unsignedInt"
+      use="optional">
+      <xsd:annotation>
+        <xsd:documentation>
+          Define the Id to be used as Logical ELI Platform ID
+          in the ELI generic header
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+
+  <xsd:complexType name="LogicalComputingNodeLinks">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="link">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="throughput" minOccurs="0" maxOccurs="1">
+              <xsd:complexType>
+                <xsd:attribute name="megaBytesPerSecond" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="latency" minOccurs="0" maxOccurs="1">
+              <xsd:complexType>
+                <xsd:attribute name="microSeconds" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+          <xsd:attribute name="id" type="NameId" />
+          <xsd:attribute name="to" type="xsd:string" use="required" />
+          <xsd:attribute name="from" type="xsd:string" use="required" />
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+
+  <xsd:complexType name="LogicalComputingPlatformLinks">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="link">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="throughput" minOccurs="0" maxOccurs="1">
+              <xsd:complexType>
+                <xsd:attribute name="megaBytesPerSecond" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="latency" minOccurs="0" maxOccurs="1">
+              <xsd:complexType>
+                <xsd:attribute name="microSeconds" type="xsd:integer"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="transportBinding" minOccurs="0"
+              maxOccurs="1">
+              <xsd:annotation>
+                <xsd:documentation>
+                  Describe on which transport protocol the logical link is associated
+                  to
+                </xsd:documentation>
+              </xsd:annotation>
+              <xsd:complexType>
+                <xsd:attribute name="protocol" type="xsd:string"
+                  use="required" />
+                <xsd:attribute name="parameters" type="xsd:anyURI"
+                  use="required" />
+              </xsd:complexType>
+            </xsd:element>
+          </xsd:sequence>
+          <xsd:attribute name="id" type="NameId" use="required" />
+          <xsd:attribute name="to" type="xsd:string" use="required" />
+          <xsd:attribute name="from" type="xsd:string" use="required" />
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+</xsd:schema>

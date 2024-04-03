@@ -1,0 +1,749 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.ecoa.technology/implementation-2.0"
+  xmlns:tns="http://www.ecoa.technology/implementation-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://www.ecoa.technology/implementation-2.0">
+  <xsd:include schemaLocation="ecoa-common-2.0.xsd"/>
+  <xsd:element name="componentImplementation" type="ComponentImplementation">
+    <!-- keys: name unicity constraints -->
+    <xsd:key name="moduleTypekey">
+      <xsd:selector xpath="tns:moduleType"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <xsd:key name="moduleImplementationkey">
+      <xsd:selector xpath="tns:moduleImplementation"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <xsd:key name="moduleInstancekey">
+      <xsd:selector xpath="tns:moduleInstance"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <xsd:key name="triggerInstancekey">
+      <xsd:selector xpath="tns:triggerInstance"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <xsd:key name="dynamicTriggerInstancekey">
+      <xsd:selector xpath="tns:dynamicTriggerInstance"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <!-- triggers, dynamicTriggers and ordinary modules must have distinct 
+      names -->
+    <xsd:key name="moduleOrTriggerInstancekey">
+      <xsd:selector
+        xpath="tns:moduleInstance|tns:triggerInstance|tns:dynamicTriggerInstance"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <!-- The same operation shall appear only one time if present in the 
+      element clients -->
+    <xsd:key name="moduleInstanceClientRequestLinkkey">
+      <xsd:selector xpath="tns:requestLink/tns:clients/tns:moduleInstance"/>
+      <xsd:field xpath="@instanceName"/>
+      <xsd:field xpath="@operationName"/>
+    </xsd:key>
+    <xsd:key name="serviceClientRequestLinkkey">
+      <xsd:selector xpath="tns:requestLink/tns:clients/tns:service"/>
+      <xsd:field xpath="@instanceName"/>
+      <xsd:field xpath="@operationName"/>
+    </xsd:key>
+    <!-- The same operation shall appear only once if present in the element 
+      servers -->
+    <xsd:key name="moduleInstanceServerRequestLinkkey">
+      <xsd:selector xpath="tns:requestLink/tns:server/tns:moduleInstance"/>
+      <xsd:field xpath="@instanceName"/>
+      <xsd:field xpath="@operationName"/>
+    </xsd:key>
+    <xsd:key name="moduleInstanceReceiversEventLinkkey">
+      <xsd:selector xpath="tns:eventLink/tns:receivers/tns:moduleInstance"/>
+      <xsd:field xpath="@instanceName"/>
+      <xsd:field xpath="@operationName"/>
+    </xsd:key>
+    <xsd:key name="moduleInstanceReadersDataLinkkey">
+      <xsd:selector xpath="tns:dataLink/tns:readers/tns:moduleInstance"/>
+      <xsd:field xpath="@instanceName"/>
+      <xsd:field xpath="@operationName"/>
+    </xsd:key>
+    <!-- keyrefs: constraints that a reference refers to a name defined in 
+      a key -->
+    <xsd:keyref name="moduleInstancekeyRef" refer="moduleInstancekey">
+      <xsd:selector xpath="*/*/tns:moduleInstance"/>
+      <xsd:field xpath="@instanceName"/>
+    </xsd:keyref>
+    <xsd:keyref name="triggerInstancekeyRef" refer="triggerInstancekey">
+      <xsd:selector xpath="tns:eventLink/tns:trigger"/>
+      <xsd:field xpath="@triggerInstance"/>
+    </xsd:keyref>
+    <xsd:keyref name="dynamicTriggerInstancekeyRef" refer="dynamicTriggerInstancekey">
+      <xsd:selector xpath="tns:eventLink/*/tns:dynamicTrigger"/>
+      <xsd:field xpath="@instanceName"/>
+    </xsd:keyref>
+    <xsd:keyref name="moduleImplementation_to_moduleType"
+      refer="moduleTypekey">
+      <xsd:selector xpath="tns:moduleImplementation"/>
+      <xsd:field xpath="@moduleType"/>
+    </xsd:keyref>
+    <xsd:keyref name="moduleInstance_to_moduleImplementation"
+      refer="moduleImplementationkey">
+      <xsd:selector xpath="tns:moduleInstance"/>
+      <xsd:field xpath="@implementationName"/>
+    </xsd:keyref>
+    <xsd:key name="pinfoname">
+      <xsd:selector
+        xpath="tns:moduleType/tns:pinfo/tns:publicPinfo|tns:moduleType/tns:pinfo/tns:privatePinfo"/>
+      <xsd:field xpath="@name"/>
+    </xsd:key>
+    <xsd:keyref name="pinfovalue_to_pinfo" refer="pinfoname">
+      <xsd:selector
+        xpath="tns:moduleInstance/tns:pinfo/tns:publicPinfo|tns:moduleInstance/tns:pinfo/tns:privatePinfo"/>
+      <xsd:field xpath="@name"/>
+    </xsd:keyref>
+  </xsd:element>
+  <xsd:complexType name="ComponentImplementation">
+    <xsd:annotation>
+      <xsd:documentation>
+        Describes all the information needed to
+        integrate the software implementation of an ECOA
+        component in an
+        ECOA system.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" ref="use"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="service"
+        type="ServiceQoS"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="reference" type="ServiceQoS"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="moduleType" type="ModuleType"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="moduleImplementation" type="ModuleImplementation"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="moduleInstance" type="ModuleInstance"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="triggerInstance" type="TriggerInstance"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="dynamicTriggerInstance" type="DynamicTriggerInstance"/>
+      <xsd:choice maxOccurs="unbounded">
+        <xsd:element maxOccurs="unbounded" minOccurs="0"
+          name="dataLink" type="DataLink"/>
+        <xsd:element maxOccurs="unbounded" minOccurs="0"
+          name="eventLink" type="EventLink"/>
+        <xsd:element maxOccurs="unbounded" minOccurs="0"
+          name="requestLink" type="RequestLink"/>
+      </xsd:choice>
+    </xsd:sequence>
+    <xsd:attribute name="componentDefinition" type="NameId"
+      use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="ServiceQoS">
+    <xsd:annotation>
+      <xsd:documentation>To define a new QoS for a provided or required
+        service
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="newQoS" type="xsd:anyURI" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="ModuleType">
+    <xsd:annotation>
+      <xsd:documentation>Describes a single-threaded ECOA module,
+        implemented as software, contributing to the implementation of
+        an ECOA component.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element minOccurs="0" name="properties">
+        <xsd:annotation>
+          <xsd:documentation>Set of module properties. The value of each
+            module property is set at design time.
+          </xsd:documentation>
+        </xsd:annotation>
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element maxOccurs="unbounded" name="property"
+              type="Parameter">
+              <xsd:annotation>
+                <xsd:documentation>The value of each module property is
+                  set at design time at instance definition level.
+                </xsd:documentation>
+              </xsd:annotation>
+            </xsd:element>
+          </xsd:sequence>
+        </xsd:complexType>
+        <xsd:unique name="propertyname">
+          <xsd:selector xpath="tns:property"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+      <xsd:element minOccurs="0" name="pinfo">
+        <xsd:annotation>
+          <xsd:documentation>Set of pinfo used by the module
+          </xsd:documentation>
+        </xsd:annotation>
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element minOccurs="0" maxOccurs="unbounded"
+              name="publicPinfo" type="PublicPinfo"/>
+            <xsd:element minOccurs="0" maxOccurs="unbounded"
+              name="privatePinfo" type="PrivatePinfo"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="operations">
+        <xsd:complexType>
+          <xsd:choice maxOccurs="unbounded">
+            <xsd:element minOccurs="0" name="dataWritten">
+              <xsd:annotation>
+                <xsd:documentation>Read+Write access to a versioned
+                  data if writeonly=false. Write only access to a
+                  versioned data if writeonly=true.
+                  Note: the writeonly attribute is ignored by the
+                  Infrastructure if controlled=false on the dataLink. 
+                </xsd:documentation>
+              </xsd:annotation>
+              <xsd:complexType>
+                <xsd:complexContent>
+                  <xsd:extension base="VersionedData">
+                    <xsd:attribute default="false" name="writeOnly"
+                      type="xsd:boolean" use="optional"/>
+                  </xsd:extension>
+                </xsd:complexContent>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element minOccurs="0" name="dataRead">
+              <xsd:annotation>
+                <xsd:documentation>Read-only access to a versioned data.
+                </xsd:documentation>
+              </xsd:annotation>
+              <xsd:complexType>
+                <xsd:complexContent>
+                  <xsd:extension base="VersionedData">
+                    <xsd:attribute default="false" name="notifying"
+                      type="xsd:boolean" use="optional"/>
+                  </xsd:extension>
+                </xsd:complexContent>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element minOccurs="0" name="eventSent"
+              type="Event">
+              <xsd:unique name="eventparameter_sent">
+                <xsd:selector xpath="tns:input"/>
+                <xsd:field xpath="@name"/>
+              </xsd:unique>
+            </xsd:element>
+            <xsd:element minOccurs="0" name="eventReceived">
+              <xsd:complexType>
+                <xsd:complexContent>
+                  <xsd:extension base="Event"/>
+                </xsd:complexContent>
+              </xsd:complexType>
+              <xsd:unique name="eventparameter_received">
+                <xsd:selector xpath="tns:input"/>
+                <xsd:field xpath="@name"/>
+              </xsd:unique>
+            </xsd:element>
+            <xsd:element minOccurs="0" name="requestSent">
+              <xsd:complexType>
+                <xsd:complexContent>
+                  <xsd:extension base="RequestResponse">
+                    <xsd:attribute name="timeout" type="xsd:double"
+                      use="required">
+                      <xsd:annotation>
+                        <xsd:documentation>Timeout value to
+                          unblock/inform respectively a
+                          synchronous/asynchronous RR
+                          If the value is
+                          negative, the timeout
+                          is infinite.
+                        </xsd:documentation>
+                      </xsd:annotation>
+                    </xsd:attribute>
+                    <xsd:attribute name="isSynchronous"
+                      type="xsd:boolean" use="required"/>
+                    <xsd:attribute name="maxConcurrentRequests"
+                      type="xsd:positiveInteger" use="optional" default="10">
+                      <xsd:annotation>
+                        <xsd:documentation>Max number of concurrent
+                          requests that the module may handle for the
+                          related container call.
+                        </xsd:documentation>
+                      </xsd:annotation>
+                    </xsd:attribute>
+                  </xsd:extension>
+                </xsd:complexContent>
+              </xsd:complexType>
+              <xsd:unique name="requestparameter_req">
+                <xsd:selector xpath="tns:input|tns:output"/>
+                <xsd:field xpath="@name"/>
+              </xsd:unique>
+            </xsd:element>
+            <xsd:element minOccurs="0" name="requestReceived">
+              <xsd:complexType>
+                <xsd:complexContent>
+                  <xsd:extension base="RequestResponse">
+                    <xsd:attribute default="10"
+                      name="maxConcurrentRequests" type="xsd:positiveInteger"
+                      use="optional">
+                      <xsd:annotation>
+                        <xsd:documentation>Max number of concurrent
+                          responses that the module may handle for the
+                          related entry-point, regardless of incoming
+                          requestLinks related to that entry-point.
+                        </xsd:documentation>
+                      </xsd:annotation>
+                    </xsd:attribute>
+                  </xsd:extension>
+                </xsd:complexContent>
+              </xsd:complexType>
+              <xsd:unique name="requestparameter_pro">
+                <xsd:selector xpath="tns:input|tns:output"/>
+                <xsd:field xpath="@name"/>
+              </xsd:unique>
+            </xsd:element>
+          </xsd:choice>
+        </xsd:complexType>
+        <xsd:key name="operationkey">
+          <xsd:selector xpath="tns:*"/>
+          <xsd:field xpath="@name"/>
+        </xsd:key>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute default="true" name="hasUserContext"
+      type="xsd:boolean" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>To indicate if the module relies on a user
+          context
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute default="true" name="hasWarmStartContext"
+      type="xsd:boolean" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>To indicate if the module relies on a warm
+          start context
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute default="false" name="isFaultHandler"
+      type="xsd:boolean" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>To indicate if the module is a Fault
+          Handler
+          or not and to generate fault handling API.
+          To enable the
+          generation, the platform has to support
+          this kind of Fault
+          Handler deployment. See Platform
+          Procurement Requirements.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute default="true" name="activatingFaultNotifs"
+      type="xsd:boolean" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Does the reception of fault notifications
+          cause the activation of the receiver Fault Handler (only if
+          the Fault Handler is implemented as an ECOA component) ?
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="Event">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="input"
+        type="Parameter"/>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="RequestResponse">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="input"
+        type="Parameter"/>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="output"
+        type="Parameter"/>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="VersionedData">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Type stored by the versioned data.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute default="1" name="maxVersions" type="xsd:positiveInteger"
+      use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Max number of versions accessed at the same
+          time.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="Parameter">
+    <xsd:annotation>
+      <xsd:documentation>A parameter a an operation (Event,
+        RequestResponse or VersionedData)
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="PublicPinfo">
+    <xsd:annotation>
+      <xsd:documentation>Logical name of a public pinfo used by a module
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="PrivatePinfo">
+    <xsd:annotation>
+      <xsd:documentation>Logical name of a private pinfo used by a
+        module
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="ModuleImplementation">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="language" type="ProgrammingLanguage"
+      use="required">
+      <xsd:annotation>
+        <xsd:documentation>Programming language</xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="moduleType" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="Instance">
+    <xsd:annotation>
+      <xsd:documentation/>
+    </xsd:annotation>
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="moduleBehaviour" type="xsd:anyURI"
+      use="optional"/>
+    <xsd:attribute name="relativePriority" type="RelativePriority"
+      use="required">
+      <xsd:annotation>
+        <xsd:documentation>
+          Relative priority of this module instance to
+          others module instances of the same component instance
+          to help
+          to distinguish them when allocating actual
+          priorities at
+          deployment level
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+  <xsd:complexType name="ModuleInstance">
+    <xsd:annotation>
+      <xsd:documentation>Describes an instance of a Module (having its
+        own internal state).
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexContent>
+      <xsd:extension base="Instance">
+        <xsd:sequence>
+          <xsd:element maxOccurs="1" minOccurs="0"
+            name="propertyValues" type="PropertyValues"/>
+          <xsd:element maxOccurs="1" minOccurs="0" name="pinfo">
+            <xsd:annotation>
+              <xsd:documentation>Set of pinfo used by the module
+              </xsd:documentation>
+            </xsd:annotation>
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element minOccurs="0" maxOccurs="unbounded"
+                  name="publicPinfo" type="PinfoValue"/>
+                <xsd:element minOccurs="0" maxOccurs="unbounded"
+                  name="privatePinfo" type="PinfoValue"/>
+              </xsd:sequence>
+            </xsd:complexType>
+            <xsd:unique name="pinfovaluename">
+              <xsd:selector xpath="tns:publicPinfo|tns:privatePinfo"/>
+              <xsd:field xpath="@name"/>
+            </xsd:unique>
+          </xsd:element>
+        </xsd:sequence>
+        <xsd:attribute name="implementationName" type="NameId"
+          use="required"/>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+
+  <xsd:simpleType name="RelativePriority">
+    <xsd:restriction base="xsd:nonNegativeInteger">
+      <xsd:minInclusive value="0"/>
+      <xsd:maxInclusive value="255"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:complexType name="PropertyValues">
+    <xsd:annotation>
+      <xsd:documentation>set of module property values
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="propertyValue"
+        type="PropertyValue">
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <xsd:complexType name="PropertyValue">
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:string">
+        <xsd:attribute name="name" type="xsd:string" use="required"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+  </xsd:complexType>
+
+  <xsd:complexType name="PinfoValue">
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:string">
+        <xsd:attribute name="name" type="xsd:string" use="required"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+  </xsd:complexType>
+
+  <xsd:complexType name="DataLink">
+    <xsd:annotation>
+      <xsd:documentation>Link between DATA operations.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="writers">
+        <xsd:complexType>
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:choice>
+              <xsd:element name="reference" type="OpRef"/>
+              <xsd:element name="moduleInstance" type="OpRef"/>
+            </xsd:choice>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="readers" minOccurs="0" maxOccurs="1">
+        <xsd:complexType>
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:choice>
+              <xsd:element name="service" type="OpRef"/>
+              <xsd:element name="moduleInstance" type="OpRefActivatableFifo"/>
+            </xsd:choice>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id" type="xsd:int" use="optional"/>
+    <xsd:attribute name="controlled" type="xsd:boolean"
+      use="optional" default="true">
+      <xsd:annotation>
+        <xsd:documentation>Boolean flag to indicate if the Versioned
+          Data access are controlled by the Infrastructure.
+          If true, each concurrent write accesses to its own copy
+          of the data and readers are ensured that the copy they
+          access is stable until the release of the VD handle.
+          Otherwise, if false, any module getting a handle may
+          directly access the local data repository (as no copy is 
+          made by the Infrastructure).
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="EventLink">
+    <xsd:annotation>
+      <xsd:documentation>Link between EVENT operations.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element minOccurs="0" name="senders">
+        <xsd:complexType>
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:choice>
+              <xsd:element name="service" type="OpRef"/>
+              <xsd:element name="reference" type="OpRef"/>
+              <xsd:element name="moduleInstance" type="OpRef"/>
+              <xsd:element name="trigger" type="OpRef_Trigger"/>
+              <xsd:element name="dynamicTrigger" type="OpRef"/>
+              <xsd:element name="external" type="OpRef_External"/>
+            </xsd:choice>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="receivers">
+        <xsd:complexType>
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:choice>
+              <xsd:element name="service" type="OpRef"/>
+              <xsd:element name="reference" type="OpRef"/>
+              <xsd:element name="moduleInstance" type="OpRefActivatableFifo"/>
+              <xsd:element name="dynamicTrigger" type="OpRefActivatingFifo"/>
+            </xsd:choice>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id" type="xsd:int" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="RequestLink">
+    <xsd:annotation>
+      <xsd:documentation>Link between RR operations. Must have exactly
+        one server. Can have many clients.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="clients">
+        <xsd:complexType>
+          <xsd:sequence maxOccurs="unbounded">
+            <xsd:choice>
+              <xsd:element name="service" type="OpRef"/>
+              <xsd:element name="moduleInstance" type="OpRefActivatable">
+                <xsd:annotation>
+                  <xsd:documentation>Note: attribute 'activating'
+                    concerns the response, and is applicable to
+                    asynchronous RR operations only.
+                  </xsd:documentation>
+                </xsd:annotation>
+              </xsd:element>
+            </xsd:choice>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="server">
+        <xsd:complexType>
+          <xsd:choice>
+            <xsd:element name="reference" type="OpRef"/>
+            <xsd:element name="moduleInstance" type="OpRefActivatableFifo">
+              <xsd:annotation>
+                <xsd:documentation>Note: optional attributes concern the
+                  request
+                </xsd:documentation>
+              </xsd:annotation>
+            </xsd:element>
+          </xsd:choice>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id" type="xsd:int" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="OpRef">
+    <xsd:attribute name="instanceName" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Reference to a module instance, a service, or
+          a reference
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="operationName" type="NameId" use="required"/>
+  </xsd:complexType>
+  <xsd:complexType name="OpRefActivatable">
+    <xsd:complexContent>
+      <xsd:extension base="OpRef">
+        <xsd:attribute default="true" name="activating"
+          type="xsd:boolean" use="optional">
+          <xsd:annotation>
+            <xsd:documentation>Does the reception of the event/data/rr
+              cause the activation of the receiver module ?
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="OpRefActivatableFifo">
+    <xsd:complexContent>
+      <xsd:extension base="OpRefActivatable">
+        <xsd:attribute default="8" name="fifoSize"
+          type="xsd:positiveInteger" use="optional">
+          <xsd:annotation>
+            <xsd:documentation>Max number of incoming operations that
+              can be
+              stored in the receiver module's FIFO queue for that
+              particular operation link, before the activation
+              of the
+              corresponding entrypoint.
+              There is one fifoSize per
+              operation link on the receiver side.
+              If this max number is
+              exceeded, new incoming operations are trashed.
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="OpRefActivatingFifo">
+    <xsd:complexContent>
+      <xsd:extension base="OpRef">
+        <xsd:attribute default="8" name="fifoSize"
+          type="xsd:positiveInteger" use="optional">
+          <xsd:annotation>
+            <xsd:documentation>Max number of incoming operations that
+              can be stored in the receiver module's FIFO queue for that
+              particular operation link, before the activation
+              of the
+              corresponding entrypoint.
+              There is one fifoSize per
+              operation link on the receiver
+              side.
+              If this max number is
+              exceeded, new incoming operations
+              are discarded.
+              These
+              operations are activating.
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="OpRef_Trigger">
+    <xsd:attribute name="instanceName" type="NameId" use="required"/>
+    <xsd:attribute name="period" type="TimeDuration" use="required">
+      <xsd:annotation>
+        <xsd:documentation>period in seconds</xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="OpRef_External">
+    <xsd:annotation>
+      <xsd:documentation>Reference used for asynchronous notfication
+        coming the legacy code (driver component)
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="operationName" type="NameId" use="required"/>
+    <xsd:attribute name="language" type="ProgrammingLanguage"
+      use="required">
+      <xsd:annotation>
+        <xsd:documentation>Programming language in which the external
+          API will be generated for the non-ECOA SW part of the driver
+          component
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="TriggerInstance">
+    <xsd:complexContent>
+      <xsd:extension base="Instance">
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="DynamicTriggerInstance">
+    <xsd:complexContent>
+      <xsd:extension base="Instance">
+        <xsd:sequence>
+          <xsd:element maxOccurs="unbounded" minOccurs="0"
+            name="parameter" type="Parameter"/>
+        </xsd:sequence>
+        <xsd:attribute default="1" name="size"
+          type="xsd:positiveInteger" use="optional">
+          <xsd:annotation>
+            <xsd:documentation>Max number of events waiting for delay
+              expiration in the trigger
+            </xsd:documentation>
+          </xsd:annotation>
+        </xsd:attribute>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+</xsd:schema>

@@ -27,3 +27,8 @@ target_compile_definitions(xsdcpp PRIVATE "VERSION=\"${PROJECT_VERSION}\"")
 install(TARGETS xsdcpp
     DESTINATION .
 )
+
+set_target_properties(xsdcpp libxsdcpp
+    PROPERTIES
+        FOLDER   "src"
+)
