@@ -112,7 +112,7 @@ public:
         _hppOutput.append("");
         _hppOutput.append("#pragma once");
         _hppOutput.append("");
-        _hppOutput.append("#include \"xsd.hpp\"");
+        _hppOutput.append(String("#include \"") + cppName + "_xsd.hpp\"");
         _hppOutput.append("");
 
         _hppOutput.append(String("namespace ") + cppName + " {");
@@ -663,7 +663,7 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, String& error)
     }
 
     {
-        String outputFilePath = outputDir + "/xsd.hpp";
+        String outputFilePath = outputDir + "/" + cppName + "_xsd.hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;

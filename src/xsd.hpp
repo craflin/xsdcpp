@@ -1,6 +1,9 @@
 
 #pragma once
 
+#ifndef XSDCPP_H
+#define XSDCPP_H
+
 #include <cstdint>
 #include <new>
 #include <string>
@@ -137,8 +140,10 @@ public:
     const T* operator->() const { return (T*)&_data; }
 
 private:
-    std::aligned_storage_t<sizeof(T), std::alignment_of<T>::value> _data;
+    typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type _data;
     bool _valid;
 };
 
 }
+
+#endif

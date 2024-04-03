@@ -1,7 +1,7 @@
 
 set(DISABLE_ADD_SUBDIRECTORY_TEST true)
 macro(add_subdirectory)
-    if(NOT DISABLE_ADD_SUBDIRECTORY_TEST OR NOT ("${ARGV0}" STREQUAL "test" OR "${ARGV0}" STREQUAL "tests"))
+    if(NOT DISABLE_ADD_SUBDIRECTORY_TEST OR NOT ("${ARGV0}" STREQUAL "test" OR "${ARGV0}" STREQUAL "tests" OR "${ARGV0}" STREQUAL "Crypto" OR "${ARGV0}" STREQUAL "Socket"))
         _add_subdirectory(${ARGV})
     endif()
 endmacro()
@@ -30,7 +30,7 @@ endmacro()
 add_subdirectory(libnstd)
 add_subdirectory(mingtest)
 
-set_target_properties(nstd nstdCrypto nstdDocument nstdSocket gtest gtest_main
+set_target_properties(nstd nstdDocument gtest gtest_main
     PROPERTIES
         FOLDER   "3rdparty"
 )
