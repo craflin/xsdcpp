@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(xsdcpp VERSION 0.2.0)
+project(xsdcpp VERSION 0.3.0)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ".cmake")
