@@ -211,32 +211,32 @@ bool skipText(Position& pos)
 const char* _escapeStrings[] = { "apos", "quot", "amp", "lt", "gt" };
 const char* _escapeChars = "'\"&<>";
 
-bool appendUnicode(uint32_t ch, char*& str)
+bool appendUnicode(uint32_t ch, std::string& str)
 {
     if ((ch & ~(0x80UL - 1)) == 0)
     {
-        *(str++) = (char)ch;
+        str.push_back((char)ch);
         return true;
     }
     if ((ch & ~(0x800UL - 1)) == 0)
     {
-        *(str++) = (ch >> 6) | 0xC0;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 6) | 0xC0);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     if ((ch & ~(0x10000UL - 1)) == 0)
     {
-        *(str++) = (ch >> 12) | 0xE0;
-        *(str++) = ((ch >> 6) & 0x3F) | 0x80;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 12) | 0xE0);
+        str.push_back(((ch >> 6) & 0x3F) | 0x80);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     if (ch < 0x110000UL)
     {
-        *(str++) = (ch >> 18) | 0xF0;
-        *(str++) = ((ch >> 12) & 0x3F) | 0x80;
-        *(str++) = ((ch >> 6) & 0x3F) | 0x80;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 18) | 0xF0);
+        str.push_back(((ch >> 12) & 0x3F) | 0x80);
+        str.push_back(((ch >> 6) & 0x3F) | 0x80);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     return false;
@@ -244,53 +244,47 @@ bool appendUnicode(uint32_t ch, char*& str)
 
 std::string unescapeString(const char* str, size_t len)
 {
-    const char* src = (const char*)memchr(str, '&', len);
-    if (!src)
-        return std::string(str, len);
-    char* destStart = (char*)alloca(len + 1);
-    size_t startLen = src - str;
-    memcpy(destStart, str, startLen);
-    char* dest = destStart + startLen;
-    for (const char* srcEnd = str + len; src < srcEnd;)
-        if (*src != '&')
-            *(dest++) = *(src++);
+    std::string result;
+    result.reserve(len);
+    for (const char* i = str, * end = str + len;;)
+    {
+        size_t remainingLen = end - i;
+        const char* next = (const char*)memchr(i, '&', remainingLen);
+        if (!next)
+            return result.append(i, remainingLen);
         else
+            result.append(i, next - i);
+        i = next + 1;
+        remainingLen = end - i;
+        const char* sequenceEnd = (const char*)memchr(i, ';', remainingLen);
+        if (!sequenceEnd)
         {
-            ++src;
-            const char* sequenceEnd = (const char*)memchr(src, ';', len - (src - str));
-            if (!sequenceEnd)
-            {
-                *(dest++) = '&';
-                continue;
-            }
-            if (*src == '#')
-            {
-                uint32_t unicodeValue;
-                if (src[1] == 'x')
-                    unicodeValue = strtoul(src + 2, nullptr, 16);
-                else
-                    unicodeValue = strtoul(src + 1, nullptr, 10);
-                if (unicodeValue == 0 || !appendUnicode(unicodeValue, dest))
-                {
-                    *(dest++) = '&';
-                    continue;
-                }
-                src = sequenceEnd + 1;
-                continue;
-            }
-            for (const char **j = _escapeStrings, **end = _escapeStrings + sizeof(_escapeStrings) / sizeof(*_escapeStrings); j < end; ++j)
-                if (strcmp(str, *j) == 0)
-                {
-                    *(dest++) = _escapeChars[j - _escapeStrings];
-                    src = sequenceEnd + 1;
-                    goto translated;
-                }
-            *(dest++) = '&';
-            continue;
-        translated:
+            result.push_back('&');
             continue;
         }
-    return std::string(destStart, dest - destStart);
+        if (*i == '#')
+        {
+            char* endptr;
+            uint32_t unicodeValue = i[1] == 'x' ? strtoul(i + 2, &endptr, 16) : strtoul(i + 1, &endptr, 10);
+            if (endptr != sequenceEnd || !appendUnicode(unicodeValue, result))
+            {
+                result.push_back('&');
+                continue;
+            }
+            i = sequenceEnd + 1;
+            continue;
+        }
+        size_t sequenceLen = sequenceEnd - i;
+        for (const char **j = _escapeStrings, **end = _escapeStrings + sizeof(_escapeStrings) / sizeof(*_escapeStrings); j < end; ++j)
+            if (strncmp(i, *j, sequenceLen) == 0)
+            {
+                result.push_back(_escapeChars[j - _escapeStrings]);
+                i = sequenceEnd + 1;
+                goto sequenceTranslated;
+            }
+        result.push_back('&');
+    sequenceTranslated:;
+    }
 }
 
 bool readToken(Context& context)

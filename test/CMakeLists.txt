@@ -17,6 +17,11 @@ function(target_require_cpp11 target)
 
 endfunction()
 
+add_executable(Parser_test Parser_test.cpp)
+target_link_libraries(Parser_test PRIVATE mingtest::gtest mingtest::gtest_main)
+add_test(NAME Parser_test COMMAND Parser_test)
+target_require_cpp11(Parser_test)
+
 add_executable(Reader_test Reader_test.cpp)
 target_link_libraries(Reader_test PRIVATE mingtest::gtest mingtest::gtest_main libxsdcpp)
 target_compile_definitions(Reader_test PRIVATE "FOLDER=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
@@ -104,7 +109,7 @@ target_include_directories(Ecoa_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_definitions(Ecoa_test PRIVATE "FOLDER=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
 add_test(NAME Ecoa_test COMMAND Ecoa_test)
 
-set_target_properties(Ecic_test Ecoa_test Generator_test Reader_test
+set_target_properties(Parser_test Ecic_test Ecoa_test Generator_test Reader_test
     PROPERTIES
         FOLDER   "test"
 )
