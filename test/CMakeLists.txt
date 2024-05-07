@@ -1,4 +1,8 @@
 
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall")
+endif()
+
 function(target_require_cpp11 target)
 
     list(FIND CMAKE_CXX_COMPILE_FEATURES cxx_std_11 feature_index)

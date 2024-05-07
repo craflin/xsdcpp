@@ -66,49 +66,6 @@ public:
         _cppOutput.append(String("using namespace ") + cppName + ";");
         _cppOutput.append("");
 
-        _cppOutput.append("uint32_t toType(const Position& pos, const char* const* values, const std::string& value)");
-        _cppOutput.append("{");
-        _cppOutput.append("    for (const char* const* i = values; *i; ++i)");
-        _cppOutput.append("        if (value == *i)");
-        _cppOutput.append("            return (uint32_t)(i - values);");
-        _cppOutput.append("    throwVerificationException(pos, \"Unknown attribute value '\" + value + \"'\");");
-        _cppOutput.append("    return 0;");
-        _cppOutput.append("}");
-        _cppOutput.append("");
-
-        _cppOutput.append("template <typename T>");
-        _cppOutput.append("T toType(const Position& pos, const std::string& value) { throwVerificationException(pos, \"Not implemented\"); return T(); }");
-        _cppOutput.append("");
-        _cppOutput.append("template <typename T>");
-        _cppOutput.append("T toType(const Position& pos, const std::string& value, const char* exceptionMessage)");
-        _cppOutput.append("{");
-        _cppOutput.append("    std::stringstream ss(value);");
-        _cppOutput.append("    T result;");
-        _cppOutput.append("    if (!(ss >> result))");
-        _cppOutput.append("         throwVerificationException(pos, exceptionMessage);");
-        _cppOutput.append("    return result;");
-        _cppOutput.append("}");
-        _cppOutput.append("");
-        _cppOutput.append("template <>");
-        _cppOutput.append("uint64_t toType<uint64_t>(const Position& pos, const std::string& value) { return toType<uint64_t>(pos, value,  \"Expected unsigned 64-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("int64_t toType<int64_t>(const Position& pos, const std::string& value) { return toType<int64_t>(pos, value,  \"Expected 64-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("uint32_t toType<uint32_t>(const Position& pos, const std::string& value) { return toType<uint32_t>(pos, value,  \"Expected unsigned 32-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("int32_t toType<int32_t>(const Position& pos, const std::string& value) { return toType<int32_t>(pos, value,  \"Expected 32-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("uint16_t toType<uint16_t>(const Position& pos, const std::string& value) { return toType<uint16_t>(pos, value,  \"Expected unsigned 16-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("int16_t toType<int16_t>(const Position& pos, const std::string& value) { return toType<int16_t>(pos, value,  \"Expected 16-bit integer value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("double toType<double>(const Position& pos, const std::string& value) { return toType<double>(pos, value,  \"Expected single precision floating point value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  \"Expected double precision floating point value\"); }");
-        _cppOutput.append("template <>");
-        _cppOutput.append("bool toType<bool>(const Position& pos, const std::string& value) { return toType<bool>(pos, value,  \"Expected boolean value\"); }");
-        _cppOutput.append("");
-    
         _hppOutput.append("");
         _hppOutput.append("#pragma once");
         _hppOutput.append("");
@@ -145,6 +102,21 @@ public:
         _cppOutput.append("");
 
         _cppOutput.append(String("namespace ") + cppName + " {");
+        _cppOutput.append("");
+
+        _cppOutput.append("void fixUnusedToTypeWarning()");
+        _cppOutput.append("{");
+        _cppOutput.append("    toType(Position(), nullptr, std::string());");
+        _cppOutput.append("    toType<uint64_t>(Position(), std::string());");
+        _cppOutput.append("    toType<int64_t>(Position(), std::string());");
+        _cppOutput.append("    toType<uint32_t>(Position(), std::string());");
+        _cppOutput.append("    toType<int32_t>(Position(), std::string());");
+        _cppOutput.append("    toType<uint16_t>(Position(), std::string());");
+        _cppOutput.append("    toType<int16_t>(Position(), std::string());");
+        _cppOutput.append("    toType<double>(Position(), std::string());");
+        _cppOutput.append("    toType<float>(Position(), std::string());");
+        _cppOutput.append("    toType<bool>(Position(), std::string());");
+        _cppOutput.append("}");
         _cppOutput.append("");
 
         for (List<Xsd::ElementRef>::Iterator i = rootType.elements.begin(), end = rootType.elements.end(); i != end; ++i)

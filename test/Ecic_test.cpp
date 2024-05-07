@@ -9,6 +9,7 @@ TEST(Example, Constructor)
     ecic.Channels.MultiChannel.emplace_back();
     ecic.Channels.MultiChannel[0].Streams.A429_Stream.emplace_back();
     std::string& str = ecic.Channels.MultiChannel[0].Streams.A429_Stream[0].Name;
+    std::string str2= str;
 }
 
 TEST(Example, load_data)

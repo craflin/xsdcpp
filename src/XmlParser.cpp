@@ -175,7 +175,6 @@ void throwVerificationException(const Position& pos, const std::string& error)
 
 bool skipText(Position& pos)
 {
-    const char* start = pos.pos;
     for (;;)
     {
         const char* end = strpbrk(pos.pos, "<\r\n");
@@ -202,7 +201,6 @@ bool skipText(Position& pos)
             if (pos.pos[1] == '!')
             {
                 skipSpace(pos);
-                start = pos.pos;
                 continue;
             }
             return true;
@@ -499,7 +497,6 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             addText(context, elementContext, std::move(text));
         }
         
-        Position pos = context.pos;
         readToken(context);
         if (context.token.type == Token::endTagBeginType)
             break;
@@ -552,5 +549,46 @@ void parse(const char* data, ElementContext& elementContext)
         throwSyntaxException(context.token.pos, "Expected '<'");
     parseElement(context, elementContext);
 }
+
+uint32_t toType(const Position& pos, const char* const* values, const std::string& value)
+{
+    for (const char* const* i = values; *i; ++i)
+        if (value == *i)
+            return (uint32_t)(i - values);
+    throwVerificationException(pos, "Unknown attribute value '" + value + "'");
+    return 0;
+}
+
+template <typename T>
+T toType(const Position& pos, const std::string& value) { throwVerificationException(pos, "Not implemented"); return T(); }
+
+template <typename T>
+T toType(const Position& pos, const std::string& value, const char* exceptionMessage)
+{
+    std::stringstream ss(value);
+    T result;
+    if (!(ss >> result))
+         throwVerificationException(pos, exceptionMessage);
+    return result;
+}
+
+template <>
+uint64_t toType<uint64_t>(const Position& pos, const std::string& value) { return toType<uint64_t>(pos, value,  "Expected unsigned 64-bit integer value"); }
+template <>
+int64_t toType<int64_t>(const Position& pos, const std::string& value) { return toType<int64_t>(pos, value,  "Expected 64-bit integer value"); }
+template <>
+uint32_t toType<uint32_t>(const Position& pos, const std::string& value) { return toType<uint32_t>(pos, value,  "Expected unsigned 32-bit integer value"); }
+template <>
+int32_t toType<int32_t>(const Position& pos, const std::string& value) { return toType<int32_t>(pos, value,  "Expected 32-bit integer value"); }
+template <>
+uint16_t toType<uint16_t>(const Position& pos, const std::string& value) { return toType<uint16_t>(pos, value,  "Expected unsigned 16-bit integer value"); }
+template <>
+int16_t toType<int16_t>(const Position& pos, const std::string& value) { return toType<int16_t>(pos, value,  "Expected 16-bit integer value"); }
+template <>
+double toType<double>(const Position& pos, const std::string& value) { return toType<double>(pos, value,  "Expected single precision floating point value"); }
+template <>
+float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
+template <>
+bool toType<bool>(const Position& pos, const std::string& value) { return toType<bool>(pos, value,  "Expected boolean value"); }
 
 }
