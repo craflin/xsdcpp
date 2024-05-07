@@ -287,6 +287,41 @@ std::string unescapeString(const char* str, size_t len)
     }
 }
 
+std::string stripComments(const char* str, size_t len)
+{
+    std::string result;
+    result.reserve(len);
+    for (const char* i = str, * end = str + len;;)
+    {
+        size_t remainingLen = end - i;
+        const char* next = (const char*)memchr(i, '<', remainingLen);
+        if (!next)
+            return result.append(i, remainingLen);
+        else
+            result.append(i, next - i);
+        i = next;
+        if (strncmp(i + 1, "!--", 3) != 0)
+            return result.append(i, end - i);
+        i += 4;
+        for (;;)
+        {
+            const char* commentEnd = strpbrk(i, "-");
+            if (!commentEnd)
+            {
+                i = end;
+                continue;
+            }
+            i = commentEnd;
+            if (strncmp(i + 1, "->", 2) == 0)
+            {
+                i += 3;
+                break;
+            }
+            ++i;
+        }
+    }
+}
+
 bool readToken(Context& context)
 {
     skipSpace(context.pos);
@@ -487,7 +522,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
         skipText(context.pos);
         if (context.pos.pos != start && elementContext.info->flags & ElementInfo::ReadTextFlag)
         {
-            std::string text(start, context.pos.pos - start);
+            std::string text = stripComments(start, context.pos.pos - start);
             addText(context, elementContext, std::move(text));
         }
         

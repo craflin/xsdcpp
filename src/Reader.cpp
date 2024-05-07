@@ -406,7 +406,9 @@ private:
 
                 Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                 type.kind = Xsd::Type::ElementKind;
-                type.baseType = _output.xmlSchemaNamespacePrefix + ":string";
+                type.baseType = "string";
+                if (!_output.xmlSchemaNamespacePrefix.isEmpty())
+                    type.baseType.prepend(_output.xmlSchemaNamespacePrefix + ":");
             }
 
             return true;
@@ -564,6 +566,14 @@ private:
             List<Xsd::AttributeRef> attributes;
             List<Xsd::ElementRef> elements;
             String baseTypeName;
+
+            String mixed = getAttribute(*position.element, "mixed");
+            if (mixed == "true")
+            {
+                baseTypeName = "string";
+                if (!_output.xmlSchemaNamespacePrefix.isEmpty())
+                    baseTypeName.prepend(_output.xmlSchemaNamespacePrefix + ":");
+            }
 
             for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
             {
