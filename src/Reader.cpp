@@ -616,7 +616,7 @@ private:
                         }
                     }
                 }
-                else if (compareXsName(position, element.type, "complexContent"))
+                else if (compareXsName(position, element.type, "complexContent") || compareXsName(position, element.type, "simpleContent"))
                 {
                     for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
                     {
