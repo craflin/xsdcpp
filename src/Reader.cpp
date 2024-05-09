@@ -8,7 +8,7 @@
 
 namespace {
 
-const Xml::Element* findElementByType(const Xml::Element& parent, const String& type)
+const Xml::Element* findElementByType2(const Xml::Element& parent, const String& type)
 {
     for (List<Xml::Variant>::Iterator i = parent.content.begin(), end = parent.content.end(); i != end; ++i)
     {
@@ -308,7 +308,7 @@ private:
             if (it == position.xsdFileData->prefixToNamespaceMap.end())
             {
                 Position result;
-                result.element = ::findElementByName(position.xsdFileData->xsd, name);
+                result.element = findElementByName(position.xsdFileData->xsd, name);
                 if (result.element)
                 {
                     result.xsdFileData = position.xsdFileData;
@@ -327,7 +327,7 @@ private:
         {
             const XsdFileData& fileData = *i;
             Position result;
-            result.element = ::findElementByName(fileData.xsd, nameWithoutPrefix);
+            result.element = findElementByName(fileData.xsd, nameWithoutPrefix);
             if (result.element)
             {
                 result.xsdFileData = &fileData;
@@ -344,7 +344,7 @@ private:
             return Position();
         const String& prefix = *it;
         Position result;
-        result.element = ::findElementByType(*position.element, prefix.isEmpty() ? type : prefix + ":" + type);
+        result.element = findElementByType2(*position.element, prefix.isEmpty() ? type : prefix + ":" + type);
         if (!result.element)
             return Position();
         result.xsdFileData = position.xsdFileData;
