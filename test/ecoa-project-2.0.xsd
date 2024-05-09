@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xs:schema xmlns="http://www.ecoa.technology/project-2.0"
+  xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified"
+  targetNamespace="http://www.ecoa.technology/project-2.0">
+  <xs:include schemaLocation="ecoa-common-2.0.xsd"/>
+
+  <xs:element name="ECOAProject" type="EcoaProject"/>
+
+
+  <xs:complexType name="EcoaProject">
+    <xs:annotation>
+      <xs:documentation>
+        Describes a whole ECOA project
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:choice maxOccurs="unbounded" minOccurs="0">
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="serviceDefinitions" type="Files"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="componentDefinitions" type="Files"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="types" type="Files"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="initialAssembly" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="componentImplementations" type="Files"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="logicalSystem" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="crossPlatformsView" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="deploymentSchema" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="outputDirectory" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="implementationAssembly" type="xs:anyURI"/>
+        <xs:element maxOccurs="unbounded" minOccurs="0"
+          name="EUIDs" type="ELI_EUIDs"/>
+      </xs:choice>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="Files">
+    <xs:annotation>
+      <xs:documentation>List of files</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" name="file" type="xs:anyURI"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="ELI_EUIDs">
+    <xs:annotation>
+      <xs:documentation>List of bindings</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="1" name="EUID"
+        type="xs:anyURI"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

@@ -36,6 +36,13 @@ struct AttributeInfo
 
 struct ElementInfo
 {
+    enum ElementFlag
+    {
+        Level1Flag = 0x01,
+        ReadTextFlag = 0x02
+    };
+    
+    size_t flags;
     const ChildElementInfo* children;
     size_t childrenCount;
     size_t mandatoryChildrenCount;
@@ -168,7 +175,6 @@ void throwVerificationException(const Position& pos, const std::string& error)
 
 bool skipText(Position& pos)
 {
-    const char* start = pos.pos;
     for (;;)
     {
         const char* end = strpbrk(pos.pos, "<\r\n");
@@ -195,7 +201,6 @@ bool skipText(Position& pos)
             if (pos.pos[1] == '!')
             {
                 skipSpace(pos);
-                start = pos.pos;
                 continue;
             }
             return true;
@@ -206,32 +211,32 @@ bool skipText(Position& pos)
 const char* _escapeStrings[] = { "apos", "quot", "amp", "lt", "gt" };
 const char* _escapeChars = "'\"&<>";
 
-bool appendUnicode(uint32_t ch, char*& str)
+bool appendUnicode(uint32_t ch, std::string& str)
 {
     if ((ch & ~(0x80UL - 1)) == 0)
     {
-        *(str++) = (char)ch;
+        str.push_back((char)ch);
         return true;
     }
     if ((ch & ~(0x800UL - 1)) == 0)
     {
-        *(str++) = (ch >> 6) | 0xC0;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 6) | 0xC0);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     if ((ch & ~(0x10000UL - 1)) == 0)
     {
-        *(str++) = (ch >> 12) | 0xE0;
-        *(str++) = ((ch >> 6) & 0x3F) | 0x80;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 12) | 0xE0);
+        str.push_back(((ch >> 6) & 0x3F) | 0x80);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     if (ch < 0x110000UL)
     {
-        *(str++) = (ch >> 18) | 0xF0;
-        *(str++) = ((ch >> 12) & 0x3F) | 0x80;
-        *(str++) = ((ch >> 6) & 0x3F) | 0x80;
-        *(str++) = (ch & 0x3F) | 0x80;
+        str.push_back((ch >> 18) | 0xF0);
+        str.push_back(((ch >> 12) & 0x3F) | 0x80);
+        str.push_back(((ch >> 6) & 0x3F) | 0x80);
+        str.push_back((ch & 0x3F) | 0x80);
         return true;
     }
     return false;
@@ -239,53 +244,82 @@ bool appendUnicode(uint32_t ch, char*& str)
 
 std::string unescapeString(const char* str, size_t len)
 {
-    const char* src = (const char*)memchr(str, '&', len);
-    if (!src)
-        return std::string(str, len);
-    char* destStart = (char*)alloca(len + 1);
-    size_t startLen = src - str;
-    memcpy(destStart, str, startLen);
-    char* dest = destStart + startLen;
-    for (const char* srcEnd = str + len; src < srcEnd;)
-        if (*src != '&')
-            *(dest++) = *(src++);
+    std::string result;
+    result.reserve(len);
+    for (const char* i = str, * end = str + len;;)
+    {
+        size_t remainingLen = end - i;
+        const char* next = (const char*)memchr(i, '&', remainingLen);
+        if (!next)
+            return result.append(i, remainingLen);
         else
+            result.append(i, next - i);
+        i = next + 1;
+        remainingLen = end - i;
+        const char* sequenceEnd = (const char*)memchr(i, ';', remainingLen);
+        if (!sequenceEnd)
         {
-            ++src;
-            const char* sequenceEnd = (const char*)memchr(src, ';', len - (src - str));
-            if (!sequenceEnd)
-            {
-                *(dest++) = '&';
-                continue;
-            }
-            if (*src == '#')
-            {
-                uint32_t unicodeValue;
-                if (src[1] == 'x')
-                    unicodeValue = strtoul(src + 2, nullptr, 16);
-                else
-                    unicodeValue = strtoul(src + 1, nullptr, 10);
-                if (unicodeValue == 0 || !appendUnicode(unicodeValue, dest))
-                {
-                    *(dest++) = '&';
-                    continue;
-                }
-                src = sequenceEnd + 1;
-                continue;
-            }
-            for (const char **j = _escapeStrings, **end = _escapeStrings + sizeof(_escapeStrings) / sizeof(*_escapeStrings); j < end; ++j)
-                if (strcmp(str, *j) == 0)
-                {
-                    *(dest++) = _escapeChars[j - _escapeStrings];
-                    src = sequenceEnd + 1;
-                    goto translated;
-                }
-            *(dest++) = '&';
-            continue;
-        translated:
+            result.push_back('&');
             continue;
         }
-    return std::string(destStart, dest - destStart);
+        if (*i == '#')
+        {
+            char* endptr;
+            uint32_t unicodeValue = i[1] == 'x' ? strtoul(i + 2, &endptr, 16) : strtoul(i + 1, &endptr, 10);
+            if (endptr != sequenceEnd || !appendUnicode(unicodeValue, result))
+            {
+                result.push_back('&');
+                continue;
+            }
+            i = sequenceEnd + 1;
+            continue;
+        }
+        size_t sequenceLen = sequenceEnd - i;
+        for (const char **j = _escapeStrings, **end = _escapeStrings + sizeof(_escapeStrings) / sizeof(*_escapeStrings); j < end; ++j)
+            if (strncmp(i, *j, sequenceLen) == 0)
+            {
+                result.push_back(_escapeChars[j - _escapeStrings]);
+                i = sequenceEnd + 1;
+                goto sequenceTranslated;
+            }
+        result.push_back('&');
+    sequenceTranslated:;
+    }
+}
+
+std::string stripComments(const char* str, size_t len)
+{
+    std::string result;
+    result.reserve(len);
+    for (const char* i = str, * end = str + len;;)
+    {
+        size_t remainingLen = end - i;
+        const char* next = (const char*)memchr(i, '<', remainingLen);
+        if (!next)
+            return result.append(i, remainingLen);
+        else
+            result.append(i, next - i);
+        i = next;
+        if (strncmp(i + 1, "!--", 3) != 0)
+            return result.append(i, end - i);
+        i += 4;
+        for (;;)
+        {
+            const char* commentEnd = strpbrk(i, "-");
+            if (!commentEnd)
+            {
+                i = end;
+                continue;
+            }
+            i = commentEnd;
+            if (strncmp(i + 1, "->", 2) == 0)
+            {
+                i += 3;
+                break;
+            }
+            ++i;
+        }
+    }
 }
 
 bool readToken(Context& context)
@@ -337,32 +371,40 @@ bool readToken(Context& context)
         }
         // no break
     default: // attribute or tag name
-    {
-        const char* end = context.pos.pos;
-        while (*end && *end != '/' && *end != '>' && *end != '=' && !isspace(*end))
-            ++end;
-        if (end == context.pos.pos)
-            throwSyntaxException(context.pos, "Expected name");
-        context.token.value = std::string(context.pos.pos, end - context.pos.pos);
-        context.token.type = Token::nameType;
-        context.pos.pos = end;
-        return true;
-    }
+        {
+            const char* end = context.pos.pos;
+            while (*end && *end != '/' && *end != '>' && *end != '=' && !isspace(*end))
+                ++end;
+            if (end == context.pos.pos)
+                throwSyntaxException(context.pos, "Expected name");
+            context.token.value = std::string(context.pos.pos, end - context.pos.pos);
+            context.token.type = Token::nameType;
+            context.pos.pos = end;
+            return true;
+        }
     }
 }
 
-void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name, ElementContext& elementContext)
+void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name_, ElementContext& elementContext)
 {
+    std::string nameWithoutNamespace;
+    const std::string* name = &name_;
+    size_t n = name_.find(':');
+    if (n != std::string::npos)
+    {
+        nameWithoutNamespace = name_.substr(n + 1);
+        name = &nameWithoutNamespace;
+    }
     for (const ElementInfo* i = parentElementContext.info; i; i = i->base)
         if (const ChildElementInfo* c = i->children)
             for (; c->name; ++c)
-                if (name == c->name)
+                if (*name == c->name)
                 {
                     size_t& count = parentElementContext.processedElements[c];
                     if (c->maxOccurs && count >= c->maxOccurs)
                     {
                         std::stringstream s;
-                        s << "Maximum occurence of element '" << name << "' is " << c->maxOccurs ;
+                        s << "Maximum occurrence of element '" << *name << "' is " << c->maxOccurs ;
                         throwVerificationException(context.pos,  s.str());
                     }
                     ++count;
@@ -371,7 +413,7 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
                     elementContext.processedElements.reserve(c->info->childrenCount);
                     return;
                 }
-    throwVerificationException(context.pos, "Unexpected element '" + name + "'");
+    throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
 }
 
 void checkElement(Context& context, const ElementContext& elementContext)
@@ -386,13 +428,13 @@ void checkElement(Context& context, const ElementContext& elementContext)
                     if (count < c->minOccurs)
                     {
                         std::stringstream s;
-                        s << "Minimum occurence of element '" << c->name << "' is " << c->minOccurs ;
+                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs ;
                         throwVerificationException(context.pos, s.str());
                     }
                 }
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, const std::string& value)
+void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, std::string&& value)
 {
     uint64_t attribute = 1;
     for (const ElementInfo* i = elementContext.info; i; i = i->base)
@@ -403,10 +445,21 @@ void setAttribute(Context& context, ElementContext& elementContext, const std::s
                     if (elementContext.processedAttributes & attribute)
                         throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
                     elementContext.processedAttributes |= attribute;
-                    a->setAttribute(elementContext.element, context.pos, value);
+                    a->setAttribute(elementContext.element, context.pos, std::move(value));
                     return;
                 }
+    if (elementContext.info->flags & ElementInfo::Level1Flag && (name.find(':') != std::string::npos || name == "xmlns"))
+        return;
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
+}
+
+void addText(Context& context, ElementContext& elementContext, std::string&& text)
+{
+    std::string& element = *(std::string*)elementContext.element;
+    if (element.empty())
+        element = std::move(text);
+    else
+        element += text;
 }
 
 void checkAttributes(Context& context, ElementContext& elementContext)
@@ -431,8 +484,6 @@ void checkAttributes(Context& context, ElementContext& elementContext)
 
 void parseElement(Context& context, ElementContext& parentElementContext)
 {
-    // int line = context.token.pos.line;
-    // int column = (int)(context.token.pos.pos - context.token.pos.lineStart) + 1;
     readToken(context);
     if (context.token.type != Token::nameType)
         throwSyntaxException(context.token.pos, "Expected tag name");
@@ -459,16 +510,22 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             readToken(context);
             if (context.token.type != Token::stringType)
                 throwSyntaxException(context.token.pos, "Expected string");
-            const std::string& attributeValue = context.token.value;
-            setAttribute(context, elementContext, attributeName, attributeValue);
+            std::string& attributeValue = context.token.value;
+            setAttribute(context, elementContext, attributeName, std::move(attributeValue));
             continue;
         }
     }
     checkAttributes(context, elementContext);
     for (;;)
     {
+        const char* start = context.pos.pos;
         skipText(context.pos);
-        Position pos = context.pos;
+        if (context.pos.pos != start && elementContext.info->flags & ElementInfo::ReadTextFlag)
+        {
+            std::string text = stripComments(start, context.pos.pos - start);
+            addText(context, elementContext, std::move(text));
+        }
+        
         readToken(context);
         if (context.token.type == Token::endTagBeginType)
             break;
@@ -478,7 +535,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             continue;
         }
         else
-            throwSyntaxException(context.token.pos, "Expected string");
+            throwSyntaxException(context.token.pos, "Expected '<'");
     }
     readToken(context);
     if (context.token.type != Token::nameType)
@@ -498,7 +555,7 @@ void parse(const char* data, ElementContext& elementContext)
     context.pos.line = 1;
     
     skipSpace(context.pos);
-    if (*context.pos.pos == '<' && context.pos.pos[1] == '?')
+    while (*context.pos.pos == '<' && context.pos.pos[1] == '?')
     {
         context.pos.pos += 2;
         for (;;)
@@ -514,11 +571,53 @@ void parse(const char* data, ElementContext& elementContext)
             context.pos.pos = end + 1;
             skipSpace(context.pos);
         }
+        skipSpace(context.pos);
     }
     readToken(context);
     if (context.token.type != Token::startTagBeginType)
         throwSyntaxException(context.token.pos, "Expected '<'");
     parseElement(context, elementContext);
 }
+
+uint32_t toType(const Position& pos, const char* const* values, const std::string& value)
+{
+    for (const char* const* i = values; *i; ++i)
+        if (value == *i)
+            return (uint32_t)(i - values);
+    throwVerificationException(pos, "Unknown attribute value '" + value + "'");
+    return 0;
+}
+
+template <typename T>
+T toType(const Position& pos, const std::string& value) { throwVerificationException(pos, "Not implemented"); return T(); }
+
+template <typename T>
+T toType(const Position& pos, const std::string& value, const char* exceptionMessage)
+{
+    std::stringstream ss(value);
+    T result;
+    if (!(ss >> result))
+         throwVerificationException(pos, exceptionMessage);
+    return result;
+}
+
+template <>
+uint64_t toType<uint64_t>(const Position& pos, const std::string& value) { return toType<uint64_t>(pos, value,  "Expected unsigned 64-bit integer value"); }
+template <>
+int64_t toType<int64_t>(const Position& pos, const std::string& value) { return toType<int64_t>(pos, value,  "Expected 64-bit integer value"); }
+template <>
+uint32_t toType<uint32_t>(const Position& pos, const std::string& value) { return toType<uint32_t>(pos, value,  "Expected unsigned 32-bit integer value"); }
+template <>
+int32_t toType<int32_t>(const Position& pos, const std::string& value) { return toType<int32_t>(pos, value,  "Expected 32-bit integer value"); }
+template <>
+uint16_t toType<uint16_t>(const Position& pos, const std::string& value) { return toType<uint16_t>(pos, value,  "Expected unsigned 16-bit integer value"); }
+template <>
+int16_t toType<int16_t>(const Position& pos, const std::string& value) { return toType<int16_t>(pos, value,  "Expected 16-bit integer value"); }
+template <>
+double toType<double>(const Position& pos, const std::string& value) { return toType<double>(pos, value,  "Expected single precision floating point value"); }
+template <>
+float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
+template <>
+bool toType<bool>(const Position& pos, const std::string& value) { return toType<bool>(pos, value,  "Expected boolean value"); }
 
 }

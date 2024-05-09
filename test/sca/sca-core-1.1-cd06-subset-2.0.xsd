@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Copyright(C) OASIS(R) 2005,2010. All Rights Reserved. OASIS trademark, IPR and other
+  policies apply. -->
+<!-- This file is a derivative work of the original OASIS XSD file: -->
+<!-- sca-core-1.1-cd06.xsd -->
+<!-- In that sense, ECOA is not fully compliant with the OASIS SCA specification. -->
+<!-- This file is provided to help users to check more easily their ECOA XML files. -->
+<!-- Consequently, this file also features some ECOA specific attributes added in some places into
+SCA complex types, in order to allow automated XML validation. However, even without these custom XSD
+attributes ECOA XML files can be validated against the original OASIS sca-core-1.1-cd06.xsd -->
+<!-- Other verification means may be used. -->
+
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:ecoa="http://www.ecoa.technology/sca-extension-2.0" xmlns:jxb="http://java.sun.com/xml/ns/jaxb"
+  xmlns:sca="http://docs.oasis-open.org/ns/opencsa/sca/200912" elementFormDefault="qualified" jxb:version="1.0"
+  targetNamespace="http://docs.oasis-open.org/ns/opencsa/sca/200912">
+
+  <import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="../xml/xml.xsd"/>
+
+  <!-- Workaround to allow within Eclipse the validation of .composite -->
+  <import namespace="http://www.ecoa.technology/sca-extension-2.0" schemaLocation="ecoa-sca-2.0.xsd"/>
+
+  <!-- Common extension base for SCA definitions -->
+  <complexType name="CommonExtensionBase">
+    <sequence>
+      <element maxOccurs="unbounded" minOccurs="0" ref="sca:documentation"/>
+    </sequence>
+  <!-- Note that the <anyAttribute namespace="##other" processContents="lax"/> 
+  originally present in the original OASIS sca-core-1.1-cd06.xsd file is not
+  contained in this subset file for ECOA. However, when replacing this subset
+  file with the original sca-core-1.1-cd06.xsd file, the presence of the 
+  <anyAttribute namespace="##other" processContents="lax"/> in the 
+  CommonExtensionBase complex type allows validating ECOA XML files which
+  feature ECOA custom attributes in some places. This guarantees the 
+  compatibility between ECOA XML files and SCA. -->
+  </complexType>
+  
+  <element name="documentation" type="sca:Documentation"/>
+  <complexType mixed="true" name="Documentation">
+    <sequence>
+      <any maxOccurs="unbounded" minOccurs="0" namespace="##other" processContents="lax"/>
+    </sequence>
+    <attribute ref="xml:lang"/>
+  </complexType>
+  <!-- Component Type -->
+  <element name="componentType" type="sca:ComponentType"/>
+  <complexType name="ComponentType">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <choice maxOccurs="unbounded" minOccurs="0">
+            <element name="service">
+              <complexType>
+                <complexContent>
+                  <restriction base="sca:ComponentService">
+                    <sequence>
+                      <sequence>
+                        <!-- Note: when replacing this 
+                        sca-core-1.1-cd06-subset.xsd file with the original 
+                        OASIS sca-core-1.1-cd06.xsd file, which contains 
+                        sca:interface in place of the following ecoa:interface,
+                        ECOA XMLs are still validated against SCA thanks to
+                        the ecoa-sca-interface-2.0.xsd which extends the 
+                        abstract sca:interface with ecoa:interface.
+                        The following explicit substitution is done here 
+                        only to help XSD validation for ECOA. -->
+                        <element ref="ecoa:interface"/>
+                      </sequence>
+                    </sequence>
+                  </restriction>
+                </complexContent>
+              </complexType>
+            </element>
+            <element name="reference" type="sca:ComponentTypeReference"/>
+            <element name="property" type="sca:Property"/>
+          </choice>
+        </sequence>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Composite -->
+  <element name="composite" type="sca:Composite"/>
+  <complexType name="Composite">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <choice maxOccurs="unbounded" minOccurs="0">
+            <element name="service" type="sca:Service"/>
+            <element name="property" type="sca:Property"/>
+            <element name="component" type="sca:Component"/>
+            <element name="reference" type="sca:Reference"/>
+            <element name="wire" type="sca:Wire"/>
+          </choice>
+        </sequence>
+        <attribute name="name" type="NCName" use="required"/>
+        <attribute name="targetNamespace" type="anyURI" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Contract base type for Service, Reference -->
+  <complexType abstract="true" name="Contract">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <element minOccurs="0" ref="ecoa:interface"/>
+        </sequence>
+        <attribute name="name" type="NCName" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Service -->
+  <complexType name="Service">
+    <complexContent>
+      <extension base="sca:Contract">
+        <attribute name="promote" type="anyURI" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Interface -->
+  <element abstract="true" name="interface" type="sca:Interface"/>
+  <complexType abstract="true" name="Interface">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase"/>
+    </complexContent>
+  </complexType>
+  <!-- Reference -->
+  <complexType name="Reference">
+    <complexContent>
+      <extension base="sca:Contract">
+        <attribute name="multiplicity" type="sca:Multiplicity" use="required"/>
+        <!-- The promote attribute is a standard SCA attribute used on a
+        composite reference, in order to provide the list of component
+        references which are promoted by this composite reference -->
+        <attribute name="promote" type="sca:listOfAnyURIs" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Property -->
+  <complexType mixed="true" name="SCAPropertyBase">
+    <sequence>
+      <any maxOccurs="unbounded" minOccurs="0" namespace="##any" processContents="lax"/>
+      <!-- NOT an extension point; This any exists to accept the element-based
+      or complex type property i.e. no element-based extension point under
+      "sca:property" -->
+    </sequence>
+    <attribute name="name" type="NCName" use="required"/>
+    <attribute name="type" type="QName" use="optional"/>
+    <anyAttribute namespace="##other" processContents="lax"/>
+  </complexType>
+  <complexType mixed="true" name="Property">
+    <complexContent mixed="true">
+      <extension base="sca:SCAPropertyBase">
+        <attribute default="false" name="mustSupply" type="boolean" use="optional"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <complexType mixed="true" name="PropertyValue">
+    <complexContent mixed="true">
+      <extension base="sca:SCAPropertyBase">
+        <attribute name="source" type="string" use="optional"/>
+        <attribute name="file" type="anyURI" use="optional"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- WireFormat Type -->
+  <element abstract="true" name="wireFormat" type="sca:WireFormatType"/>
+  <complexType abstract="true" name="WireFormatType">
+    <!-- <anyAttribute namespace="##other" processContents="lax"/> -->
+  </complexType>
+  <!-- Component -->
+  <complexType name="Component">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <element ref="sca:implementation"/>
+          <choice maxOccurs="unbounded" minOccurs="0">
+            <element name="service" type="sca:ComponentService"/>
+            <element name="reference" type="sca:ComponentReference"/>
+            <element name="property" type="sca:PropertyValue"/>
+            <!-- <element ref="sca:requires"/> -->
+            <!-- <element ref="sca:policySetAttachment"/> -->
+          </choice>
+          <!-- <element ref="sca:extensions" minOccurs="0" maxOccurs="1" /> -->
+        </sequence>
+        <attribute name="name" type="NCName" use="required"/>
+      </extension>
+      <!-- <attribute name="autowire" type="boolean" use="optional"/> -->
+      <!-- <attribute name="requires" type="sca:listOfQNames" -->
+      <!-- use="optional"/> -->
+      <!-- <attribute name="policySets" type="sca:listOfQNames" -->
+      <!-- use="optional"/> -->
+    </complexContent>
+  </complexType>
+  <!-- Component Service -->
+  <complexType name="ComponentService">
+    <complexContent>
+      <extension base="sca:Contract"/>
+    </complexContent>
+  </complexType>
+  <!-- Component Reference -->
+  <complexType name="ComponentReference">
+    <complexContent>
+      <extension base="sca:Contract">
+        <attribute default="1..1" name="multiplicity" type="sca:Multiplicity" use="optional"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Component Type Reference -->
+  <complexType name="ComponentTypeReference">
+    <complexContent>
+      <restriction base="sca:ComponentReference">
+        <sequence>
+          <element maxOccurs="unbounded" minOccurs="0" ref="sca:documentation"/>
+          <element ref="ecoa:interface"/>
+        </sequence>
+        <attribute name="name" type="NCName" use="required"/>
+        <attribute default="1..1" name="multiplicity" type="sca:Multiplicity" use="optional"/>
+      </restriction>
+    </complexContent>
+  </complexType>
+  <!-- Implementation -->
+  <element abstract="true" name="implementation" type="sca:Implementation"/>
+  <complexType abstract="true" name="Implementation">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase"/>
+    </complexContent>
+  </complexType>
+  <!-- Implementation Type -->
+  <element name="implementationType" type="sca:ImplementationType"/>
+  <complexType name="ImplementationType">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <attribute name="type" type="QName" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Wire -->
+  <complexType name="Wire">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <any maxOccurs="unbounded" minOccurs="0" namespace="##other" processContents="lax"/>
+        </sequence>
+        <attribute name="source" type="anyURI" use="required"/>
+        <attribute name="target" type="anyURI" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+  <!-- Extensions element -->
+  <element name="extensions">
+    <complexType>
+      <sequence>
+        <any maxOccurs="unbounded" minOccurs="1" namespace="##other" processContents="lax"/>
+      </sequence>
+    </complexType>
+  </element>
+  <!-- Value type definition for property values -->
+  <element name="value" type="sca:ValueType"/>
+  <complexType mixed="true" name="ValueType">
+    <sequence>
+      <any maxOccurs="unbounded" minOccurs="0" namespace="##any" processContents="lax"/>
+    </sequence>
+    <anyAttribute namespace="##any" processContents="lax"/>
+  </complexType>
+  <!-- Miscellaneous simple type definitions -->
+  <simpleType name="Multiplicity">
+    <restriction base="string">
+      <enumeration value="0..1"/>
+      <enumeration value="1..1"/>
+      <enumeration value="0..n"/>
+      <enumeration value="1..n"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="listOfQNames">
+    <list itemType="QName"/>
+  </simpleType>
+  <simpleType name="listOfAnyURIs">
+    <list itemType="anyURI"/>
+  </simpleType>
+</schema>

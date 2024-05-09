@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" xmlns:ecoa-sca="http://www.ecoa.technology/sca-extension-2.0"
+  targetNamespace="http://www.ecoa.technology/sca-extension-2.0">
+
+  <attribute name="type" type="xs:string"/>
+
+  <attribute name="deployment" type="xs:string"/>
+
+  <complexType name="wireInformation">
+    <annotation>
+      <documentation>Any additional wire information parameters required
+        by the system integrator (non-defined by ECOA) e.g.
+        CIA (Confidentiality, Integrity and Availability)
+      </documentation>
+    </annotation>
+    <attribute name="link" type="anyURI">
+      <annotation>
+        <documentation>Link to any external file containing parameters
+        </documentation>
+      </annotation>
+    </attribute>
+  </complexType>
+
+</schema>

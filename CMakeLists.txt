@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
-project(xsdcpp VERSION 0.1.0)
+project(xsdcpp VERSION 0.3.0)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER ".cmake")
@@ -12,6 +12,7 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
     set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /MT /Os /Oy /O1 /GF /GL")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi")
     set(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL "/OPT:REF /OPT:ICF /INCREMENTAL:NO /LTCG")
     set(CMAKE_STATIC_LINKER_FLAGS_MINSIZEREL "/LTCG")
 endif()
@@ -31,17 +32,17 @@ add_subdirectory(test)
 install(FILES NOTICE LICENSE DESTINATION .)
 
 if(WIN32)
-    deploy_export(xsxcpp EXECUTABLE
+    deploy_export(xsdcpp EXECUTABLE
         CONFIGURATION Release
-        IMPORTED_LOCATION xsxcpp.exe
+        IMPORTED_LOCATION xsdcpp.exe
     )
-    deploy_export(xsxcpp EXECUTABLE
+    deploy_export(xsdcpp EXECUTABLE
         CONFIGURATION Debug
-        IMPORTED_LOCATION xsxcpp.exe
+        IMPORTED_LOCATION xsdcpp.exe
     )
 else()
-    deploy_export(xsxcpp EXECUTABLE
-        IMPORTED_LOCATION xsxcpp
+    deploy_export(xsdcpp EXECUTABLE
+        IMPORTED_LOCATION xsdcpp
     )
 endif()
 

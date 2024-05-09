@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Copyright(C) OASIS(R) 2005,2010. All Rights Reserved. OASIS trademark, IPR and other policies apply. -->
+<!-- This file is a derivative work of the original OASIS XSD file: -->
+<!-- sca-contribution-1.1-cd06.xsd -->
+<!-- In that sense, ECOA is not fully compliant with the OASIS SCA specification. -->
+<!-- This file is provided to help users to check more easily their ECOA XML files. -->
+<!-- Other verification means may be used. -->
+
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:ecoa="http://www.ecoa.technology/sca-extension-2.0" xmlns:sca="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+  elementFormDefault="qualified" targetNamespace="http://docs.oasis-open.org/ns/opencsa/sca/200912">
+
+  <import namespace="http://www.ecoa.technology/sca-extension-2.0" schemaLocation="ecoa-sca-2.0.xsd"/>
+
+  <include schemaLocation="sca-core-1.1-cd06-subset-2.0.xsd"/>
+
+  <!-- Contribution -->
+  <element name="contribution" type="sca:ContributionType"/>
+  <complexType name="ContributionType">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <element maxOccurs="unbounded" minOccurs="0" name="deployable" type="sca:DeployableType"/>
+        </sequence>
+      </extension>
+    </complexContent>
+  </complexType>
+
+  <!-- Deployable -->
+  <complexType name="DeployableType">
+    <complexContent>
+      <extension base="sca:CommonExtensionBase">
+        <sequence>
+          <any maxOccurs="unbounded" minOccurs="0" namespace="##other" processContents="lax"/>
+        </sequence>
+        <attribute ref="ecoa:deployment"/>
+        <attribute name="composite" type="QName" use="required"/>
+      </extension>
+    </complexContent>
+  </complexType>
+
+</schema>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:ecoa="http://www.ecoa.technology/sca-extension-2.0"
+  xmlns:jxb="http://java.sun.com/xml/ns/jaxb" xmlns:sca="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+  elementFormDefault="qualified" jxb:version="1.0"
+  targetNamespace="http://www.ecoa.technology/sca-extension-2.0">
+
+  <!-- This file contains the extension of the abstract sca:interface into 
+    a concrete ecoa:interface. It allows ecoa:interface elements to be used in 
+    XML files wherever sca:interface is being allowed in SCA XSDs -->
+
+  <import namespace="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+    schemaLocation="../sca-core-1.1-cd06-subset-2.0.xsd"/>
+
+  <element name="interface" substitutionGroup="sca:interface"
+    type="ecoa:Interface">
+    <annotation>
+      <appinfo>
+        <jxb:class name="ecoaInterfaceElement"/>
+      </appinfo>
+    </annotation>
+  </element>
+
+  <complexType name="Interface">
+    <annotation>
+      <appinfo>
+        <jxb:class name="EcoaInterface"/>
+      </appinfo>
+    </annotation>
+    <complexContent>
+      <extension base="sca:Interface">
+        <attribute name="syntax" type="anyURI" use="required"/>
+        <attribute name="qos" type="anyURI" use="optional"/>
+      </extension>
+    </complexContent>
+  </complexType>
+
+</schema>

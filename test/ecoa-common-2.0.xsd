@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified">
+
+  <!-- The following regexps define what is allowed/forbidden for each kind 
+    of names used in ECOA. They must take into account the contraints of different 
+    programming languages and development environments supported by ECOA (characters 
+    allowed in file names, identifiers, etc.) NOTE: XML character classes (\i, 
+    \c, etc.) are intentionally avoided, because of the complexity of their definition. -->
+
+  <!-- Name of a library containing data types -->
+  <!-- Note: The '.' character is used to structure libraries into hierarchical 
+    namespaces (like Java packages). -->
+  <xsd:simpleType name="LibraryName">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[A-Za-z][A-Za-z0-9_\.]*"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <!-- Name that can be used as an identifier in ECOA models and in the source 
+    code of ECOA components -->
+  <!-- Note: Names starting with '_' are excluded from ECOA models. -->
+  <xsd:simpleType name="NameId">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="[A-Za-z][A-Za-z0-9_]*"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <!-- Name of a data type inside a library -->
+  <xsd:simpleType name="TypeName">
+    <xsd:restriction base="NameId">
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <!-- Name of a type, possibly prefixed by the name of the library that 
+    defines it. -->
+  <!-- The prefix may be omitted only for predefined types. -->
+  <!-- A type T defined in a library L will be denoted "L:T". -->
+  <xsd:simpleType name="TypeQName">
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="([A-Za-z][A-Za-z0-9_\.]*:)?[A-Za-z][A-Za-z0-9_]*"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:element name="use">
+
+    <xsd:annotation>
+      <xsd:documentation>Declares the use of a library of data types. A
+        type T defined in a library L will be denoted "L:T".
+      </xsd:documentation>
+    </xsd:annotation>
+
+    <xsd:complexType>
+      <xsd:attribute name="library" type="LibraryName"
+        use="required"/>
+    </xsd:complexType>
+  </xsd:element>
+
+  <xsd:simpleType name="HexOrDecValue">
+    <xsd:annotation>
+      <xsd:documentation> This type shall be used as the base type for
+        any XML schema attribute or element that contains a hex-encoded
+        binary value or a decimal-coded binary value.
+        This hex-encoded binary value contains the mandatory string 0x
+        followed by a finite-length sequence of characters 0–9 and a–f.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:pattern value="0x[0-9A-Fa-f]+|[1-9][0-9]*|0"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="ProgrammingLanguage">
+    <xsd:annotation>
+      <xsd:documentation>Programming languages supported by ECOA
+        bindings
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="C"/>
+      <xsd:enumeration value="C++"/>
+      <xsd:enumeration value="Ada"/>
+      <xsd:enumeration value="Java"/>
+      <xsd:enumeration value="HI_Ada"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="TimeDuration">
+    <xsd:annotation>
+      <xsd:documentation>The unit is in seconds</xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:double">
+      <xsd:minInclusive value="0.0"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:simpleType name="Steps">
+    <xsd:annotation>
+      <xsd:documentation>A number of logical steps
+        This allows to size
+        durations in an abstract way.
+        See stepDuration in the logical
+        system
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:restriction base="xsd:double">
+      <xsd:minInclusive value="0.0"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+
+</xsd:schema>

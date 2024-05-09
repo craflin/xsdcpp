@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:ecoa="http://www.ecoa.technology/sca-extension-2.0"
+  xmlns:sca="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+  elementFormDefault="qualified" targetNamespace="http://www.ecoa.technology/sca-extension-2.0">
+
+  <!-- This file contains the extension of the abstract sca:implementation 
+    into a concrete ecoa:instance. It allows ecoa:instance elements to be used 
+    in XML files wherever sca:implementation is being allowed in SCA XSDs -->
+
+  <import namespace="http://docs.oasis-open.org/ns/opencsa/sca/200912"
+    schemaLocation="../sca-core-1.1-cd06-subset-2.0.xsd"/>
+
+  <element name="instance" substitutionGroup="sca:implementation"
+    type="ecoa:Instance"/>
+
+  <complexType name="Instance">
+    <complexContent>
+      <extension base="sca:Implementation">
+        <sequence>
+          <element maxOccurs="1" minOccurs="0" name="implementation">
+            <complexType>
+              <attribute name="name" type="string" use="required"/>
+            </complexType>
+          </element>
+        </sequence>
+        <attribute name="componentType" type="anyURI" use="required"/>
+        <attribute name="version" type="string" use="optional"/>
+      </extension>
+    </complexContent>
+  </complexType>
+
+</schema>

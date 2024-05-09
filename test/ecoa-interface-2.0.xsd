@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.ecoa.technology/interface-2.0"
+  xmlns:tns="http://www.ecoa.technology/interface-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://www.ecoa.technology/interface-2.0">
+  <xsd:include schemaLocation="ecoa-common-2.0.xsd"/>
+  <xsd:element name="serviceDefinition" type="ServiceDefinition"/>
+  <xsd:complexType name="ServiceDefinition">
+    <xsd:annotation>
+      <xsd:documentation>The definition of an ECOA service, including a
+        set of
+        operations.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" ref="use"/>
+      <xsd:element name="operations" type="Operations">
+        <xsd:unique name="operationname">
+          <xsd:selector xpath="tns:data|tns:event|tns:requestresponse"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+  <xsd:complexType name="Operations">
+    <xsd:annotation>
+      <xsd:documentation>A set of named operations.</xsd:documentation>
+    </xsd:annotation>
+    <xsd:choice maxOccurs="unbounded" minOccurs="0">
+      <xsd:element name="data" type="Data"/>
+      <xsd:element name="event" type="Event">
+        <xsd:unique name="eventparameter">
+          <xsd:selector xpath="tns:input"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+      <xsd:element name="requestresponse" type="RequestResponse">
+        <xsd:unique name="requestparameter">
+          <xsd:selector xpath="tns:input|tns:output"/>
+          <xsd:field xpath="@name"/>
+        </xsd:unique>
+      </xsd:element>
+    </xsd:choice>
+  </xsd:complexType>
+  <xsd:complexType abstract="true" name="Operation">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="comment" type="xsd:string" use="optional"/>
+  </xsd:complexType>
+  <xsd:complexType name="Data">
+    <xsd:annotation>
+      <xsd:documentation>Use of the "versioned data" exchange mechanism.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexContent>
+      <xsd:extension base="Operation">
+        <xsd:attribute name="type" type="TypeQName" use="required"/>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="Event">
+    <xsd:annotation>
+      <xsd:documentation>Use of the "event" exchange mechanism.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexContent>
+      <xsd:extension base="Operation">
+        <xsd:sequence>
+          <xsd:element maxOccurs="unbounded" minOccurs="0"
+            name="input" type="Parameter"/>
+        </xsd:sequence>
+        <xsd:attribute name="direction" type="E_EventDirection"
+          use="required"/>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:complexType name="RequestResponse">
+    <xsd:annotation>
+      <xsd:documentation>Use of the "request-response" exchange
+        mechanism.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:complexContent>
+      <xsd:extension base="Operation">
+        <xsd:sequence>
+          <xsd:element maxOccurs="unbounded" minOccurs="0"
+            name="input" type="Parameter"/>
+          <xsd:element maxOccurs="unbounded" minOccurs="0"
+            name="output" type="Parameter"/>
+        </xsd:sequence>
+      </xsd:extension>
+    </xsd:complexContent>
+  </xsd:complexType>
+  <xsd:simpleType name="E_EventDirection">
+    <xsd:restriction base="xsd:string">
+      <xsd:enumeration value="SENT_BY_PROVIDER"/>
+      <xsd:enumeration value="RECEIVED_BY_PROVIDER"/>
+    </xsd:restriction>
+  </xsd:simpleType>
+  <xsd:complexType name="Parameter">
+    <xsd:attribute name="name" type="NameId" use="required"/>
+    <xsd:attribute name="type" type="TypeQName" use="required"/>
+  </xsd:complexType>
+</xsd:schema>

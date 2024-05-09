@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns="http://www.ecoa.technology/deployment-2.0"
+  xmlns:tns="http://www.ecoa.technology/deployment-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://www.ecoa.technology/deployment-2.0">
+  <xsd:include schemaLocation="ecoa-common-2.0.xsd" />
+
+  <xsd:element name="deployment" type="Deployment">
+    <xsd:key name="execnamekey">
+      <xsd:selector xpath="tns:protectionDomain" />
+      <xsd:field xpath="@name" />
+    </xsd:key>
+    <xsd:key name="deployedModuleInstanceKey">
+      <xsd:selector xpath="tns:protectionDomain/tns:deployedModuleInstance" />
+      <xsd:field xpath="@componentName" />
+      <xsd:field xpath="@moduleInstanceName" />
+    </xsd:key>
+    <xsd:key name="deployedTriggerInstanceKey">
+      <xsd:selector xpath="tns:protectionDomain/tns:deployedTriggerInstance" />
+      <xsd:field xpath="@componentName" />
+      <xsd:field xpath="@triggerInstanceName" />
+    </xsd:key>
+    <xsd:unique name="componentLogKey">
+      <xsd:selector xpath="tns:logPolicy/tns:componentLog" />
+      <xsd:field xpath="@instanceName" />
+    </xsd:unique>
+    <xsd:key name="computingPlatformConfigurationKey">
+      <xsd:selector xpath="tns:computingPlatformConfiguration" />
+      <xsd:field xpath="@name" />
+    </xsd:key>
+    <xsd:key name="wireMappingKey">
+      <xsd:selector xpath="tns:wireMapping" />
+      <xsd:field xpath="@source" />
+      <xsd:field xpath="@target" />
+      <xsd:field xpath="@mappedOnLinkId" />
+    </xsd:key>
+  </xsd:element>
+  <xsd:complexType name="Deployment">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" name="protectionDomain"
+        type="ProtectionDomain" />
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="logPolicy"
+        type="LogPolicy" />
+      <xsd:element maxOccurs="unbounded" minOccurs="1"
+        name="platformConfiguration" type="PlatformConfiguration">
+        <xsd:annotation>
+          <xsd:documentation>Defines platform-wide settings
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="wireMapping"
+        type="WireMapping">
+        <xsd:annotation>
+          <xsd:documentation>Defines a mapping between a wire and a
+            computing platform link
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="finalAssembly" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Name of the composite referenced by this
+          deployment
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="logicalSystem" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Name of the logical system this deployment is
+          made on
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+  <xsd:complexType name="ProtectionDomain">
+    <xsd:annotation>
+      <xsd:documentation>Defines an OS executable, offering memory (and
+        possibly also temporal) protection
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="executeOn">
+        <xsd:complexType>
+          <xsd:attribute name="computingNode" type="NameId" use="required" />
+          <xsd:attribute name="computingPlatform" type="NameId"
+            use="required">
+            <xsd:annotation>
+              <xsd:documentation>Id of a logical system.
+              </xsd:documentation>
+            </xsd:annotation>
+          </xsd:attribute>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:choice maxOccurs="unbounded" minOccurs="0">
+        <xsd:element maxOccurs="unbounded" minOccurs="0"
+          name="deployedModuleInstance">
+          <xsd:complexType>
+            <xsd:attribute name="componentName" type="NameId" use="required" />
+            <xsd:attribute name="moduleInstanceName" type="NameId"
+              use="required" />
+            <xsd:attribute name="modulePriority" type="ModulePriority"
+              use="required">
+              <xsd:annotation>
+                <xsd:documentation>Abstract module priority that can be
+                  used by the platform to map the module on an
+                  actual OS priority
+                </xsd:documentation>
+              </xsd:annotation>
+            </xsd:attribute>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:element maxOccurs="unbounded" minOccurs="0"
+          name="deployedTriggerInstance">
+          <xsd:complexType>
+            <xsd:attribute name="componentName" type="NameId" use="required" />
+            <xsd:attribute name="triggerInstanceName" type="NameId"
+              use="required" />
+            <xsd:attribute name="triggerPriority" type="ModulePriority"
+              use="required">
+              <xsd:annotation>
+                <xsd:documentation>Abstract trigger priority that can be
+                  used by the platform to map the trigger on an actual
+                  OS priority
+                </xsd:documentation>
+              </xsd:annotation>
+            </xsd:attribute>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:choice>
+    </xsd:sequence>
+    <xsd:attribute name="name" type="NameId" use="required" />
+  </xsd:complexType>
+
+  <xsd:simpleType name="ModulePriority">
+    <xsd:restriction base="xsd:decimal">
+      <xsd:minInclusive value="0" />
+      <xsd:maxInclusive value="255" />
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:complexType name="LogPolicy">
+    <xsd:annotation>
+      <xsd:documentation>Defines the log policy for deployed components
+        and modules
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="componentLog"
+        type="ComponentLog">
+        <xsd:key name="moduleIdKey">
+          <xsd:selector xpath="./tns:moduleLog" />
+          <xsd:field xpath="@instanceName" />
+        </xsd:key>
+      </xsd:element>
+    </xsd:sequence>
+  </xsd:complexType>
+
+  <xsd:complexType name="ComponentLog">
+    <xsd:annotation>
+      <xsd:documentation>Defines default level of logging for a given
+        component
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0" name="moduleLog"
+        type="ModuleLog"/>
+    </xsd:sequence>
+    <xsd:attribute name="instanceName" type="xsd:string" use="required" />
+    <xsd:attribute name="enabledLevels" type="xsd:string" use="required" />
+  </xsd:complexType>
+
+  <xsd:complexType name="ModuleLog">
+    <xsd:annotation>
+      <xsd:documentation>Defines level of logging for a deployed module
+        instance
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="instanceName" type="xsd:string" use="required" />
+    <xsd:attribute name="enabledLevels" type="xsd:string" use="required" />
+  </xsd:complexType>
+
+  <xsd:complexType name="PlatformConfiguration">
+    <xsd:sequence>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="computingNodeConfiguration" type="ComputingNodeConfiguration">
+        <xsd:annotation>
+          <xsd:documentation>Defines the computing node level
+            configuration
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element maxOccurs="unbounded" minOccurs="0"
+        name="platformMessages" type="PlatformMessages">
+        <xsd:annotation>
+          <xsd:documentation>Define on which the platform
+            domain messages are mapped
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="computingPlatform" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Id of a logical system.</xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="faultHandlerNotificationMaxNumber" type="FifoSize"
+      use="optional" default="8">
+      <xsd:annotation>
+        <xsd:documentation>Defines the number of fault handler
+          notifications that a Module Container shall be able
+          to handle at any time. These notifications are
+          relevant depending on the Module “isFaultHandler”
+          attribute.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="EUIDs" type="xsd:anyURI" use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Specific EUIDS file associated to one
+          given peer of the link
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+  <xsd:simpleType name="FifoSize">
+    <xsd:restriction base="xsd:decimal">
+      <xsd:minInclusive value="1" />
+      <xsd:maxInclusive value="255" />
+    </xsd:restriction>
+  </xsd:simpleType>
+
+  <xsd:complexType name="ComputingNodeConfiguration">
+    <xsd:attribute name="computingNode" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Id of a logical computing node
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="schedulingInformation" type="xsd:anyURI"
+      use="optional">
+      <xsd:annotation>
+        <xsd:documentation>Link to any external file containing any
+          additional scheduling parameters required by the system
+          integrator (non-defined by ECOA)
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+  <xsd:complexType name="PlatformMessages">
+    <xsd:attribute name="mappedOnLinkId" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Refers to the inter-platforms link
+          on which the platform-level management messages
+          are mapped. The link is defined in
+          the logical system.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+  <xsd:complexType name="WireMapping">
+    <xsd:annotation>
+      <xsd:documentation>Defines a mapping between a wire and a
+        computing platform link
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:attribute name="source" type="xsd:anyURI" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Wire Source
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="target" type="xsd:anyURI" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Wire Target
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+    <xsd:attribute name="mappedOnLinkId" type="NameId" use="required">
+      <xsd:annotation>
+        <xsd:documentation>Refers to the inter-nodes 
+          or the inter-platforms link
+          on which the wire is mapped. The link is
+          is defined at platform description level
+          in the logical system.
+        </xsd:documentation>
+      </xsd:annotation>
+    </xsd:attribute>
+  </xsd:complexType>
+
+</xsd:schema>
