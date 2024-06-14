@@ -659,6 +659,13 @@ double toType<double>(const Position& pos, const std::string& value) { return to
 template <>
 float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
 template <>
-bool toType<bool>(const Position& pos, const std::string& value) { return toType<bool>(pos, value,  "Expected boolean value"); }
+bool toType<bool>(const Position& pos, const std::string& value)
+{
+    std::stringstream ss(value);
+    bool result;
+    if (!(ss >> std::boolalpha >> result))
+         throwVerificationException(pos, "Expected boolean value");
+    return result;
+}
 
 }

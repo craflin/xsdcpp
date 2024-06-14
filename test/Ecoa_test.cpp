@@ -25,6 +25,25 @@ TEST(Ecoa_implementation, Constructor)
     ecoa_implementation_2_0::ComponentImplementation componentImplementation;
 }
 
+TEST(Ecoa_implementation, booleanAttribute)
+{
+    std::string data = R"(<?xml version="1.0" encoding="UTF-8"?>
+<componentImplementation xmlns="http://www.ecoa.technology/implementation-2.0" componentDefinition="Philosopher">
+  <use library="Dining"/>
+  <moduleType name="Philosopher_modMain_t">
+    <operations>
+      <requestSent name="take" isSynchronous="true" timeout="10.0">
+        <input name="which" type="Dining:Chopstick_id"/>
+        <input name="who" type="Dining:Philosopher_id"/>
+        <output name="taken" type="ECOA:boolean8"/>
+      </requestSent>
+    </operations>
+  </moduleType>
+</componentImplementation>)";
+    ecoa_implementation_2_0::ComponentImplementation componentImplementation;
+    ecoa_implementation_2_0::load_data(data, componentImplementation);
+}
+
 TEST(Ecoa_componentType, Constructor)
 {
     sca_1_1_cd06_subset_2_0::sca_ComponentType componentType;
