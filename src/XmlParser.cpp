@@ -39,7 +39,8 @@ struct ElementInfo
     enum ElementFlag
     {
         Level1Flag = 0x01,
-        ReadTextFlag = 0x02
+        ReadTextFlag = 0x02,
+        SkipProcessingFlag = 0x04,
     };
     
     size_t flags;
@@ -173,7 +174,7 @@ void throwVerificationException(const Position& pos, const std::string& error)
     throw std::runtime_error(s.str());
 }
 
-bool skipText(Position& pos)
+void skipText(Position& pos)
 {
     for (;;)
     {
@@ -203,7 +204,7 @@ bool skipText(Position& pos)
                 skipSpace(pos);
                 continue;
             }
-            return true;
+            return;
         }
     }
 }
@@ -322,7 +323,7 @@ std::string stripComments(const char* str, size_t len)
     }
 }
 
-bool readToken(Context& context)
+void readToken(Context& context)
 {
     skipSpace(context.pos);
     context.token.pos = context.pos;
@@ -333,21 +334,21 @@ bool readToken(Context& context)
         {
             context.token.type = Token::endTagBeginType;
             context.pos.pos += 2;
-            return true;
+            return;
         }
         context.token.type = Token::startTagBeginType;
         ++context.pos.pos;
-        return true;
+        return;
     case '>':
         context.token.type = Token::tagEndType;
         ++context.pos.pos;
-        return true;
+        return;
     case '\0':
         throwSyntaxException(context.pos, "Unexpected end of file");
     case '=':
         context.token.type = Token::equalsSignType;
         ++context.pos.pos;
-        return true;
+        return;
     case '"':
     case '\'': {
         char endChars[4] = "x\r\n";
@@ -360,14 +361,14 @@ bool readToken(Context& context)
         context.token.value = unescapeString(context.pos.pos + 1, end - context.pos.pos - 1);
         context.token.type = Token::stringType;
         context.pos.pos = end + 1;
-        return true;
+        return;
     }
     case '/':
         if (context.pos.pos[1] == '>')
         {
             context.token.type = Token::emptyTagEndType;
             context.pos.pos += 2;
-            return true;
+            return;
         }
         // no break
     default: // attribute or tag name
@@ -380,7 +381,39 @@ bool readToken(Context& context)
             context.token.value = std::string(context.pos.pos, end - context.pos.pos);
             context.token.type = Token::nameType;
             context.pos.pos = end;
-            return true;
+            return;
+        }
+    }
+}
+
+void skipTextAndSubElements(Context& context, const std::string& elementName)
+{
+    for (;;)
+    {
+        skipText(context.pos);
+        Position posBackup = context.pos;
+        readToken(context);
+        switch (context.token.type)
+        {
+        case Token::startTagBeginType:
+            readToken(context);
+            if (context.token.type == Token::nameType)
+            {
+                std::string elementName = std::move(context.token.value);
+                skipTextAndSubElements(context, elementName);
+                readToken(context);
+            }
+            break;
+        case Token::endTagBeginType:
+            readToken(context);
+            if (context.token.type == Token::nameType && context.token.value == elementName)
+            {
+                context.pos = posBackup;
+                return;
+            }
+            break;
+        default:
+            break;
         }
     }
 }
@@ -518,13 +551,21 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     checkAttributes(context, elementContext);
     for (;;)
     {
-        const char* start = context.pos.pos;
-        skipText(context.pos);
-        if (context.pos.pos != start && elementContext.info->flags & ElementInfo::ReadTextFlag)
+        if (elementContext.info->flags & ElementInfo::ReadTextFlag)
         {
-            std::string text = stripComments(start, context.pos.pos - start);
-            addText(context, elementContext, std::move(text));
+            const char* start = context.pos.pos;
+            if (elementContext.info->flags & ElementInfo::SkipProcessingFlag)
+                skipTextAndSubElements(context, elementName);
+            else
+                skipText(context.pos);
+            if (context.pos.pos != start)
+            {
+                std::string text = stripComments(start, context.pos.pos - start);
+                addText(context, elementContext, std::move(text));
+            }
         }
+        else
+            skipText(context.pos);
         
         readToken(context);
         if (context.token.type == Token::endTagBeginType)

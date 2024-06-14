@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<csa:composite xmlns:csa="http://docs.oasis-open.org/ns/opencsa/sca/200912" xmlns:ecoa-sca="http://www.ecoa.technology/sca-extension-2.0" name="Milliways" targetNamespace="http://www.ecoa.technology/default">
+  <csa:component name="Socrates">
+    <csa:property name="ID"><csa:value>3</csa:value></csa:property>
+    <ecoa-sca:instance componentType="Philosopher">
+      <ecoa-sca:implementation name="Philosopher_Impl"/>
+    </ecoa-sca:instance>
+    <csa:reference name="Chopstick"/>
+  </csa:component>
+  <csa:component name="Our_Table">
+    <ecoa-sca:instance componentType="Table" version="">
+      <ecoa-sca:implementation name="Table_Impl"/>
+    </ecoa-sca:instance>
+    <csa:service name="Chopsticks"/>
+  </csa:component>
+  <csa:component name="Plato">
+    <ecoa-sca:instance componentType="Philosopher">
+      <ecoa-sca:implementation name="Philosopher_Impl"/>
+    </ecoa-sca:instance>
+    <csa:property name="ID"><csa:value>1</csa:value></csa:property>
+    <csa:reference name="Chopstick"/>
+  </csa:component>
+  <csa:component name="Eipcurus">
+    <ecoa-sca:instance componentType="Philosopher">
+      <ecoa-sca:implementation name="Philosopher_Impl"/>
+    </ecoa-sca:instance>
+    <csa:property name="ID"><csa:value>4</csa:value></csa:property>
+    <csa:reference name="Chopstick"/>
+  </csa:component>
+  <csa:component name="Aristotle">
+    <ecoa-sca:instance componentType="Philosopher">
+      <ecoa-sca:implementation name="Philosopher_Impl"/>
+    </ecoa-sca:instance>
+    <csa:property name="ID"><csa:value>2</csa:value></csa:property>
+    <csa:reference name="Chopstick"/>
+  </csa:component>
+  <csa:component name="Confucius">
+    <ecoa-sca:instance componentType="Philosopher">
+      <ecoa-sca:implementation name="Philosopher_Impl"/>
+    </ecoa-sca:instance>
+    <csa:property name="ID"><csa:value>5</csa:value></csa:property>
+    <csa:reference name="Chopstick"/>
+  </csa:component>
+  <csa:wire source="Socrates/Chopstick" target="Our_Table/Chopsticks"/>
+  <csa:wire source="Plato/Chopstick" target="Our_Table/Chopsticks"/>
+  <csa:wire source="Eipcurus/Chopstick" target="Our_Table/Chopsticks"/>
+  <csa:wire source="Aristotle/Chopstick" target="Our_Table/Chopsticks"/>
+  <csa:wire source="Confucius/Chopstick" target="Our_Table/Chopsticks"/>
+</csa:composite>

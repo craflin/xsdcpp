@@ -209,7 +209,27 @@ private:
         return type.attributes.size() + getAttributesCount(type.baseType);
     }
 
-    bool getReadText(const String& typeName) const
+    enum ReadTextMode
+    {
+        SkipMode,
+        ReadAndProcessMode,
+        SkipProcessingMode,
+    };
+
+    bool isSkipProcessContentsFlagSet(const String& typeName) const 
+    {
+        if (typeName.isEmpty())
+            return false;
+        HashMap<String, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        if (it2 == _xsd.types.end())
+            return false;
+        if (it2->flags & Xsd::Type::SkipProcessContentsFlag)
+            return true;
+        const Xsd::Type& type = *it2;
+        return isSkipProcessContentsFlagSet(type.baseType);
+    }
+
+    bool isBaseTypeString(const String& typeName) const
     {
         if (typeName.isEmpty())
             return false;
@@ -224,7 +244,16 @@ private:
         if (it2 == _xsd.types.end())
             return false;
         const Xsd::Type& type = *it2;
-        return getReadText(type.baseType);
+        return isBaseTypeString(type.baseType);
+    }
+
+    ReadTextMode getReadTextMode(const String& typeName) const
+    {
+        if (typeName.isEmpty() || !isBaseTypeString(typeName))
+            return SkipMode;
+        if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
+            return SkipProcessingMode;
+        return ReadAndProcessMode;
     }
 
     static String toCStringLiteral(const String& str)
@@ -580,8 +609,17 @@ private:
             String flags = "0";
             if (level == 1)
                 flags.append("|ElementInfo::Level1Flag");
-            if (getReadText(typeName))
+            switch (getReadTextMode(typeName))
+            {
+            case SkipMode:
+                break;
+            case ReadAndProcessMode:
                 flags.append("|ElementInfo::ReadTextFlag");
+                break;
+            case SkipProcessingMode:
+                flags.append("|ElementInfo::ReadTextFlag|ElementInfo::SkipProcessingFlag");
+                break;
+            }
 
             if (baseCppName == "xsd::string")
                 baseCppName.clear();

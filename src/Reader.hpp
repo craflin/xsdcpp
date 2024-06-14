@@ -55,6 +55,11 @@ struct Xsd
         // when ElementKind
         List<AttributeRef> attributes;
         List<ElementRef> elements;
+        enum Flags
+        {
+            SkipProcessContentsFlag = 1,
+        };
+        uint32 flags;
 
         // when UnionKind
         List<String> memberTypes;

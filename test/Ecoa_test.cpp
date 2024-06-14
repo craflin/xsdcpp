@@ -35,6 +35,31 @@ TEST(Ecoa_composite, Constructor)
     sca_1_1_cd06_subset_2_0::sca_Composite composite;
 }
 
+TEST(Ecoa_composite, skipProcessing)
+{
+    {
+        sca_1_1_cd06_subset_2_0::sca_Composite composite;
+        sca_1_1_cd06_subset_2_0::load_file(FOLDER "/Milliways.impl.composite", composite);
+        EXPECT_EQ(composite.component.size(), 6);
+        EXPECT_EQ(composite.component[0].property[0].name, "ID");
+        EXPECT_EQ(composite.component[0].property[0], "<csa:value>3</csa:value>");
+    }
+
+    {
+        std::string data = R"(<csa:composite name="xy" targetNamespace="http://www.ecoa.technology/default">
+    <csa:component name="Socrates">
+        <csa:property name="ID"><csa:value><csa:property>3</csa:property></csa:value></csa:property>
+    </csa:component>
+</csa:composite>)";
+
+        sca_1_1_cd06_subset_2_0::sca_Composite composite;
+        sca_1_1_cd06_subset_2_0::load_data(data, composite);
+        EXPECT_EQ(composite.component.size(), 1);
+        EXPECT_EQ(composite.component[0].property[0].name, "ID");
+        EXPECT_EQ(composite.component[0].property[0], "<csa:value><csa:property>3</csa:property></csa:value>");
+    }
+}
+
 TEST(Ecoa_deployment, Constructor)
 {
     ecoa_deployment_2_0::Deployment deployment;

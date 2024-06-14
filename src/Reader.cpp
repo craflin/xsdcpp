@@ -566,6 +566,7 @@ private:
             List<Xsd::AttributeRef> attributes;
             List<Xsd::ElementRef> elements;
             String baseTypeName;
+            uint32 flags = 0;
 
             String mixed = getAttribute(*position.element, "mixed");
             if (mixed == "true")
@@ -592,13 +593,14 @@ private:
                 }
                 else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
                 {
-                    if (!processXsAllEtAl(childPosition, typeName, elements))
+                    if (!processXsAllEtAl(childPosition, typeName, elements, flags))
                         return false;
                 }
                 else if (compareXsName(position, element.type, "choice"))
                 {
                     List<Xsd::ElementRef> choiceElements;
-                    if (!processXsAllEtAl(childPosition, typeName, choiceElements))
+                    uint32 _;
+                    if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
                         return false;
 
                     if (!choiceElements.isEmpty())
@@ -652,13 +654,14 @@ private:
                                 }
                                 else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
                                 {
-                                    if (!processXsAllEtAl(childPosition, typeName, elements))
+                                    if (!processXsAllEtAl(childPosition, typeName, elements, flags))
                                         return false;
                                 }
                                 else if (compareXsName(position, element.type, "choice"))
                                 {
                                     List<Xsd::ElementRef> choiceElements;
-                                    if (!processXsAllEtAl(childPosition, typeName, choiceElements))
+                                    uint32 _;
+                                    if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
                                         return false;
 
                                     if (!choiceElements.isEmpty())
@@ -699,6 +702,7 @@ private:
             type.baseType = baseTypeName;
             type.attributes.swap(attributes);
             type.elements.swap(elements);
+            type.flags = flags;
             return true;
 
         }
@@ -795,7 +799,7 @@ private:
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
     }
 
-    bool processXsAllEtAl(const Position& position, const String& parentTypeName, List<Xsd::ElementRef>& elements)
+    bool processXsAllEtAl(const Position& position, const String& parentTypeName, List<Xsd::ElementRef>& elements, uint32& flags)
     {
         for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
         {
@@ -829,7 +833,8 @@ private:
                 choicePosition.xsdFileData = position.xsdFileData;
             
                 List<Xsd::ElementRef> choiceElements;
-                if (!processXsAllEtAl(choicePosition, parentTypeName,  choiceElements))
+                uint32 _;
+                if (!processXsAllEtAl(choicePosition, parentTypeName,  choiceElements, _))
                     return false;
 
                 if (!choiceElements.isEmpty())
@@ -853,12 +858,14 @@ private:
                 choicePosition.element = &element;
                 choicePosition.xsdFileData = position.xsdFileData;
             
-                if (!processXsAllEtAl(choicePosition, parentTypeName,  elements))
+                if (!processXsAllEtAl(choicePosition, parentTypeName,  elements, flags))
                     return false;
             }
             else if (compareXsName(position, element.type, "any"))
             {
-                ;
+                 String processContents = getAttribute(element, "processContents");
+                 if (processContents == "skip" || processContents == "lax")
+                     flags |= Xsd::Type::SkipProcessContentsFlag;
             }
             else
                 Console::printf("skipped %s\n", (const char*)element.type);
