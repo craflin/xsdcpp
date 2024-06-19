@@ -15,6 +15,20 @@ TEST(Ecoa_types, Constructor)
     library.types.array.emplace_back();
 }
 
+TEST(Ecoa_types, union)
+{
+    std::string data = R"(<?xml version="1.0" encoding="UTF-8"?>
+<library xmlns="http://www.ecoa.technology/types-2.0">
+  <types>
+    <simple maxRange="8" minRange="0" name="Philosopher_id" precision="1" type="ECOA:int32" unit="Philosopher"/>
+    <simple maxRange="7" minRange="0" name="Chopstick_id" type="ECOA:int32" unit="Chopstick"/>
+  </types>
+</library>)";
+    ecoa_types_2_0::Library library;
+    ecoa_types_2_0::load_data(data, library);
+}
+
+
 TEST(Ecoa_interface, Constructor)
 {
     ecoa_interface_2_0::ServiceDefinition serviceDefinition;
@@ -48,6 +62,19 @@ TEST(Ecoa_componentType, Constructor)
 {
     sca_1_1_cd06_subset_2_0::sca_ComponentType componentType;
 }
+
+TEST(Ecoa_componentType, restrictions)
+{
+    std::string data = R"(<?xml version="1.0" encoding="UTF-8"?>
+<csa:componentType xmlns:csa="http://docs.oasis-open.org/ns/opencsa/sca/200912" xmlns:ecoa-sca="http://www.ecoa.technology/sca-extension-2.0">
+  <csa:service name="Chopsticks">
+    <ecoa-sca:interface syntax="svc_Chopsticks"/>
+  </csa:service>
+</csa:componentType>)";
+    sca_1_1_cd06_subset_2_0::sca_ComponentType componentType;
+    sca_1_1_cd06_subset_2_0::load_data(data, componentType);
+}
+
 
 TEST(Ecoa_composite, Constructor)
 {

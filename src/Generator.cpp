@@ -577,7 +577,7 @@ private:
                     return false;
                 Xsd::Type& type = *it;
                 const Xsd::Type& finalType = resolveFinalType(type);
-                if (finalType.kind == Xsd::Type::StringKind)
+                if (finalType.kind == Xsd::Type::StringKind || type.kind == Xsd::Type::UnionKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position&, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = std::move(value); }");
                 else
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = toType<" + attributeTypeCppName + ">(pos, value); }");

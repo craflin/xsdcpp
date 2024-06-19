@@ -633,54 +633,54 @@ private:
                             if (!processType(position, baseTypeName))
                                 return false;
 
-                            if (compareXsName(position, element.type, "restriction"))
-                                baseTypeName.clear(); // todo: I don't see what we should inherit from the baseType in this case.
-
-                            for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
+                            if (!compareXsName(position, element.type, "restriction")) // todo: proper handling of restrictions
                             {
-                                const Xml::Variant& variant = *i;
-                                if (!variant.isElement())
-                                    continue;
-                                const Xml::Element& element = variant.toElement();
-                                Position childPosition;
-                                childPosition.element = &element;
-                                childPosition.xsdFileData = position.xsdFileData;
+                                for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
+                                {
+                                    const Xml::Variant& variant = *i;
+                                    if (!variant.isElement())
+                                        continue;
+                                    const Xml::Element& element = variant.toElement();
+                                    Position childPosition;
+                                    childPosition.element = &element;
+                                    childPosition.xsdFileData = position.xsdFileData;
 
-                                if (compareXsName(position, element.type, "attribute"))
-                                {
-                                    Xsd::AttributeRef& attribute = attributes.append(Xsd::AttributeRef());
-                                    if (!processXsAttribute(childPosition, attribute))
-                                        return false;
-                                }
-                                else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
-                                {
-                                    if (!processXsAllEtAl(childPosition, typeName, elements, flags))
-                                        return false;
-                                }
-                                else if (compareXsName(position, element.type, "choice"))
-                                {
-                                    List<Xsd::ElementRef> choiceElements;
-                                    uint32 _;
-                                    if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
-                                        return false;
-
-                                    if (!choiceElements.isEmpty())
+                                    if (compareXsName(position, element.type, "attribute"))
                                     {
-                                        Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                                        elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
-                                        elementRef.maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
+                                        Xsd::AttributeRef& attribute = attributes.append(Xsd::AttributeRef());
+                                        if (!processXsAttribute(childPosition, attribute))
+                                            return false;
+                                    }
+                                    else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
+                                    {
+                                        if (!processXsAllEtAl(childPosition, typeName, elements, flags))
+                                            return false;
+                                    }
+                                    else if (compareXsName(position, element.type, "choice"))
+                                    {
+                                        List<Xsd::ElementRef> choiceElements;
+                                        uint32 _;
+                                        if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
+                                            return false;
 
-                                        for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
+                                        if (!choiceElements.isEmpty())
                                         {
-                                            const Xsd::ElementRef& choiceElement = *i;
-                                            Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
-                                            groupMember.name = choiceElement.name;
-                                            groupMember.typeName = choiceElement.typeName;
+                                            Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
+                                            elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
+                                            elementRef.maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
+
+                                            for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
+                                            {
+                                                const Xsd::ElementRef& choiceElement = *i;
+                                                Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
+                                                groupMember.name = choiceElement.name;
+                                                groupMember.typeName = choiceElement.typeName;
+                                            }
                                         }
                                     }
+                                    else
+                                        Console::printf("skipped %s\n", (const char*)element.type);
                                 }
-                                else
-                                    Console::printf("skipped %s\n", (const char*)element.type);
                             }
                         }
                     }
