@@ -60,7 +60,7 @@ TEST(Ecoa_implementation, booleanAttribute)
 
 TEST(Ecoa_componentType, Constructor)
 {
-    sca_1_1_cd06_subset_2_0::sca_ComponentType componentType;
+    sca_1_1_cd06_subset_2_0::ComponentType componentType;
 }
 
 TEST(Ecoa_componentType, restrictions)
@@ -71,20 +71,20 @@ TEST(Ecoa_componentType, restrictions)
     <ecoa-sca:interface syntax="svc_Chopsticks"/>
   </csa:service>
 </csa:componentType>)";
-    sca_1_1_cd06_subset_2_0::sca_ComponentType componentType;
+    sca_1_1_cd06_subset_2_0::ComponentType componentType;
     sca_1_1_cd06_subset_2_0::load_data(data, componentType);
 }
 
 
 TEST(Ecoa_composite, Constructor)
 {
-    sca_1_1_cd06_subset_2_0::sca_Composite composite;
+    sca_1_1_cd06_subset_2_0::Composite composite;
 }
 
 TEST(Ecoa_composite, skipProcessing)
 {
     {
-        sca_1_1_cd06_subset_2_0::sca_Composite composite;
+        sca_1_1_cd06_subset_2_0::Composite composite;
         sca_1_1_cd06_subset_2_0::load_file(FOLDER "/Milliways.impl.composite", composite);
         EXPECT_EQ(composite.component.size(), 6);
         EXPECT_EQ(composite.component[0].property[0].name, "ID");
@@ -98,7 +98,7 @@ TEST(Ecoa_composite, skipProcessing)
     </csa:component>
 </csa:composite>)";
 
-        sca_1_1_cd06_subset_2_0::sca_Composite composite;
+        sca_1_1_cd06_subset_2_0::Composite composite;
         sca_1_1_cd06_subset_2_0::load_data(data, composite);
         EXPECT_EQ(composite.component.size(), 1);
         EXPECT_EQ(composite.component[0].property[0].name, "ID");

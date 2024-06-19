@@ -47,8 +47,6 @@ target_link_libraries(Ecic_test PRIVATE mingtest::gtest mingtest::gtest_main)
 target_include_directories(Ecic_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 add_test(NAME Ecic_test COMMAND Ecic_test)
 
-
-
 add_custom_command(
     COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-types-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_types_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_types_2_0.cpp"

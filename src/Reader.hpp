@@ -7,26 +7,32 @@
 
 struct Xsd
 {
-    struct AttributeRef
+    struct Name
     {
         String name;
-        String typeName;
+        String namespace_;
+    };
+
+    struct AttributeRef
+    {
+        Name name;
+        Name typeName;
         bool isMandatory;
         String defaultValue;
     };
 
     struct GroupMember
     {
-        String name;
-        String typeName;
+        Name name;
+        Name typeName;
     };
 
     struct ElementRef
     {
-        String name;
+        Name name;
         uint minOccurs;
         uint maxOccurs;
-        String typeName;
+        Name typeName;
         List<GroupMember> groupMembers;
     };
 
@@ -45,7 +51,7 @@ struct Xsd
         Kind kind;
 
         // when ElementKind, SimpleRefKind, or ListKind
-        String baseType;
+        Name baseType;
 
         // when StringKind
         String pattern;
@@ -63,16 +69,30 @@ struct Xsd
         uint32 flags;
 
         // when UnionKind
-        List<String> memberTypes;
+        List<Name> memberTypes;
     };
 
     String name;
-    HashMap<String, Type> types;
-    String rootType;
+    HashMap<Name, Type> types;
+    Name rootType;
 
     HashSet<String> targetNamespaces;
+    HashMap<String, String> namespaceToSuggestedPrefix;
 
-    String xmlSchemaNamespacePrefix;
+    //String xmlSchemaNamespacePrefix;
 };
+
+inline usize hash(const Xsd::Name& name)
+{
+    usize result = hash(name.namespace_);
+    result *= 16807;
+    result ^= hash(name.name);
+    return result;
+}
+
+inline bool operator==(const Xsd::Name& lh, const Xsd::Name& rh)
+{
+    return lh.name == rh.name && lh.namespace_ == rh.namespace_;
+}
 
 bool readXsd(const String& name, const String& file, Xsd& xsd, String& error);
