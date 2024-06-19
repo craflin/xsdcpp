@@ -3,6 +3,7 @@
 #pragma once
 
 #include <nstd/Document/Xml.hpp>
+#include <nstd/HashSet.hpp>
 
 struct Xsd
 {
@@ -68,6 +69,9 @@ struct Xsd
     String name;
     HashMap<String, Type> types;
     String rootType;
+
+    HashSet<String> targetNamespaces;
+
     String xmlSchemaNamespacePrefix;
 };
 

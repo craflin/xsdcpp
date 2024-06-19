@@ -183,6 +183,7 @@ private:
             return (_error = String::fromPrintf("Could not load file '%s': %s", (const char*)file, (const char*) parser.getErrorString())), false;
 
         String targetNamespace = getAttribute(xsd, "targetNamespace");
+        _output.targetNamespaces.append(targetNamespace);
 
         _namespaces.append(targetNamespace, NamespaceData());
         NamespaceData& namespaceData = _namespaces.back();

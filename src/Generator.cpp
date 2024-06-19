@@ -40,6 +40,17 @@ String toCppFieldIdentifier(const String& str)
     return toCppTypeIdentifier(stripNamespacePrefix(str));
 }
 
+String toCStringLiteral(const String& str)
+{
+    String result;
+    result.reserve(str.length() + 4);
+    result.append("\"");
+    // todo: replace stuff
+    result.append(str);
+    result.append("\"");
+    return result;
+}
+
 class Generator
 {
 public:
@@ -64,6 +75,15 @@ public:
         _cppOutput.append("");
 
         _cppOutput.append(String("using namespace ") + cppName + ";");
+        _cppOutput.append("");
+
+        _cppOutput.append("const char* _namespaces[] = {");
+        for (HashSet<String>::Iterator i = _xsd.targetNamespaces.begin(), end = _xsd.targetNamespaces.end(); i != end; ++i)
+            _cppOutput.append(String("    ") + toCStringLiteral(*i) + ",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema-instance") == _xsd.targetNamespaces.end())
+            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema-instance\",");
+        _cppOutput.append("    nullptr");
+        _cppOutput.append("};");
         _cppOutput.append("");
 
         _hppOutput.append("");
@@ -130,7 +150,7 @@ public:
             _cppOutput.append("    ElementContext elementContext;");
             _cppOutput.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
             _cppOutput.append("    elementContext.element = &rootElement;");
-            _cppOutput.append("    parse(data.c_str(), elementContext);");
+            _cppOutput.append("    parse(data.c_str(), _namespaces, elementContext);");
             _cppOutput.append(String("    output = std::move(rootElement.") + elementCppName + ");");
             _cppOutput.append("}");
             _cppOutput.append("");

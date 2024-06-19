@@ -91,6 +91,8 @@ struct Context
 {
     Position pos;
     Token token;
+    const char** namespaces;
+    std::unordered_map<std::string, size_t> namespacePrefixToIndex;
 };
 
 void skipSpace(Position& pos)
@@ -481,8 +483,30 @@ void setAttribute(Context& context, ElementContext& elementContext, const std::s
                     a->setAttribute(elementContext.element, context.pos, std::move(value));
                     return;
                 }
-    if (elementContext.info->flags & ElementInfo::Level1Flag && (name.find(':') != std::string::npos || name == "xmlns"))
-        return;
+    if (elementContext.info->flags & ElementInfo::Level1Flag)
+    {
+        if (name.compare(0, 5, "xmlns") == 0 && (name.size() == 5 || name.c_str()[5] == ':'))
+        {
+            std::string namespacePrefix;
+            if (name.size() > 6)
+                namespacePrefix = name.substr(6);
+            size_t namespaceIndex = 0;
+            for (const char** ns = context.namespaces; *ns; ++ns, ++namespaceIndex)
+                if (value == *ns)
+                {
+                    context.namespacePrefixToIndex.insert(std::pair<std::string, size_t>(namespacePrefix, namespaceIndex));
+                    return;
+                }
+            throwVerificationException(context.pos, "Unknown namespace '" + value + "'");
+        }
+        size_t n = name.find(':');
+        if (n != std::string::npos && name.compare(n + 1, std::string::npos, "noNamespaceSchemaLocation") == 0)
+        {
+            std::unordered_map<std::string, size_t>::const_iterator it = context.namespacePrefixToIndex.find(name.substr(0, n));
+            if (it != context.namespacePrefixToIndex.end() && strcmp(context.namespaces[it->second], "http://www.w3.org/2001/XMLSchema-instance") == 0)
+                return;
+        }
+    }
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
@@ -589,11 +613,12 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     checkElement(context, elementContext);
 }
 
-void parse(const char* data, ElementContext& elementContext)
+void parse(const char* data, const char** namespaces, ElementContext& elementContext)
 {
     Context context;
     context.pos.pos = context.pos.lineStart = data;
     context.pos.line = 1;
+    context.namespaces = namespaces;
     
     skipSpace(context.pos);
     while (*context.pos.pos == '<' && context.pos.pos[1] == '?')
