@@ -80,6 +80,8 @@ public:
             _cppOutput.append(String("    ") + toCStringLiteral(*i) + ",");
         if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema-instance") == _xsd.targetNamespaces.end())
             _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema-instance\",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema") == _xsd.targetNamespaces.end())
+            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema\",");
         _cppOutput.append("    nullptr");
         _cppOutput.append("};");
         _cppOutput.append("");
@@ -481,6 +483,8 @@ private:
                     return false;
                 structFields.append(attributeCppName + " " + toCppFieldIdentifier(attributeRef.name));
             }
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                structFields.append("xsd::vector<xsd::any_attribute> other_attributes");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
                 const Xsd::ElementRef& elementRef = *i;
@@ -604,6 +608,8 @@ private:
                 if (!attributeRef.isMandatory && !attributeRef.defaultValue.isEmpty())
                     _cppOutput.append(String("void default_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeTypeCppName, finalType, attributeRef.defaultValue) + "; }");
             }
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                _cppOutput.append(String("void any_") + cppName + "(" + cppName + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
@@ -628,6 +634,8 @@ private:
             String flags = "0";
             if (level == 1)
                 flags.append("|ElementInfo::Level1Flag");
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                flags.append("|ElementInfo::AnyAttributeFlag");
             switch (getReadTextMode(typeName))
             {
             case SkipMode:
@@ -644,7 +652,9 @@ private:
                 baseCppName.clear();
 
             _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flags + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
-                + ",  " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + " };");
+                + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") 
+                + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(set_any_attribute_t)&any_") + cppName : String("nullptr"))
+                + " };");
             _cppOutput.append("");
 
             return true;

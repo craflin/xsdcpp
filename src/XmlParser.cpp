@@ -14,8 +14,9 @@ struct Position;
 struct ElementInfo;
 
 typedef void* (*get_element_field_t)(void*);
-typedef void (*set_attribute_t)(void*, const Position&, const std::string& value);
+typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
 typedef void (*set_attribute_default_t)(void*);
+typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
 
 struct ChildElementInfo
 {
@@ -41,6 +42,7 @@ struct ElementInfo
         Level1Flag = 0x01,
         ReadTextFlag = 0x02,
         SkipProcessingFlag = 0x04,
+        AnyAttributeFlag = 0x08,
     };
     
     size_t flags;
@@ -50,6 +52,7 @@ struct ElementInfo
     const AttributeInfo* attributes;
     size_t attributesCount;
     const ElementInfo* base;
+    set_any_attribute_t setOtherAttribute;
 };
 
 struct ElementContext
@@ -469,7 +472,7 @@ void checkElement(Context& context, const ElementContext& elementContext)
                 }
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, std::string&& value)
+void setAttribute(Context& context, ElementContext& elementContext, std::string&& name, std::string&& value)
 {
     uint64_t attribute = 1;
     for (const ElementInfo* i = elementContext.info; i; i = i->base)
@@ -507,6 +510,13 @@ void setAttribute(Context& context, ElementContext& elementContext, const std::s
                 return;
         }
     }
+    for (const ElementInfo* i = elementContext.info; i; i = i->base)
+        if (i->flags & ElementInfo::AnyAttributeFlag)
+        {
+            i->setOtherAttribute(elementContext.element, std::move(name), std::move(value));
+            return;
+        }
+
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
@@ -568,7 +578,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.token.type != Token::stringType)
                 throwSyntaxException(context.token.pos, "Expected string");
             std::string& attributeValue = context.token.value;
-            setAttribute(context, elementContext, attributeName, std::move(attributeValue));
+            setAttribute(context, elementContext, std::move(attributeName), std::move(attributeValue));
             continue;
         }
     }

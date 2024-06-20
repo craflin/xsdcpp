@@ -144,6 +144,12 @@ private:
     bool _valid;
 };
 
+struct any_attribute
+{
+    std::string name;
+    xsd::string value;
+};
+
 }
 
 #endif

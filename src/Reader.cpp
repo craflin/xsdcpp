@@ -759,7 +759,7 @@ private:
                 }
                 else if (compareXsName(position, element.type, "anyAttribute"))
                 {
-                    ;
+                    flags |= Xsd::Type::AnyAttributeFlag;
                 }
                 else
                     Console::printf("skipped %s\n", (const char*)element.type);

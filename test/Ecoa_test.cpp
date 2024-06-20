@@ -28,7 +28,6 @@ TEST(Ecoa_types, union)
     ecoa_types_2_0::load_data(data, library);
 }
 
-
 TEST(Ecoa_interface, Constructor)
 {
     ecoa_interface_2_0::ServiceDefinition serviceDefinition;
@@ -75,6 +74,22 @@ TEST(Ecoa_componentType, restrictions)
     sca_1_1_cd06_subset_2_0::load_data(data, componentType);
 }
 
+TEST(Ecoa_componentType, anyAttribute)
+{
+    std::string data = R"(<?xml version="1.0" encoding="UTF-8"?>
+<csa:componentType xmlns:csa="http://docs.oasis-open.org/ns/opencsa/sca/200912" xmlns:ecoa-sca="http://www.ecoa.technology/sca-extension-2.0" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <csa:property name="ID" type="xsd:string" ecoa-sca:type="Dining:Philosopher_id" ecoa-sca:library="Dining"/>
+  <csa:reference name="Chopstick">
+    <ecoa-sca:interface syntax="svc_Chopsticks"/>
+  </csa:reference>
+</csa:componentType>)";
+    sca_1_1_cd06_subset_2_0::ComponentType componentType;
+    sca_1_1_cd06_subset_2_0::load_data(data, componentType);
+    EXPECT_EQ(componentType.property[0].other_attributes[0].name, "ecoa-sca:type");
+    EXPECT_EQ(componentType.property[0].other_attributes[0].value, "Dining:Philosopher_id");
+    EXPECT_EQ(componentType.property[0].other_attributes[1].name, "ecoa-sca:library");
+    EXPECT_EQ(componentType.property[0].other_attributes[1].value, "Dining");
+}
 
 TEST(Ecoa_composite, Constructor)
 {

@@ -36,11 +36,14 @@ Notable supported features:
 * optional elements and lists of elements,
 * default attribute values,
 * attribute presence validation,
-* substitution groups.
+* substitution groups,
+* lax and skip content processing,
+* any attributes.
 
 Known missing feature are:
 * proper element occurrence validation,
-* attribute regex validation.
+* attribute regex validation,
+* correct processing of namespaced element or attribute names.
 
 ## Build Instructions
 

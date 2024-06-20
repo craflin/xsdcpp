@@ -65,6 +65,7 @@ struct Xsd
         enum Flags
         {
             SkipProcessContentsFlag = 1,
+            AnyAttributeFlag = 2,
         };
         uint32 flags;
 
