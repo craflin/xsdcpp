@@ -44,7 +44,7 @@ const Xml::Element* findElementByName(const Xml::Element& parent, const String& 
     }
     return nullptr;
 }
-
+/*
 bool compareElementName(const HashMap<String, String>& namespaceToPrefixMap, const String& elementName, const String& namespace_, const String& name)
 {
     HashMap<String, String>::Iterator it = namespaceToPrefixMap.find(namespace_);
@@ -55,7 +55,7 @@ bool compareElementName(const HashMap<String, String>& namespaceToPrefixMap, con
         return elementName == name;
     return elementName.length() == namespacePrefix.length() + 1 + name.length() && elementName.startsWith(namespacePrefix) && ((const char*)elementName)[namespacePrefix.length()] == ':' && elementName.endsWith(name);
 }
-
+*/
 class Reader
 {
 public:
@@ -80,7 +80,8 @@ public:
         if (elements.isEmpty())
             return (_error = "Root element not found"), false;
 
-        String rootTypeName = "_root_t";
+        Xsd::Name rootTypeName;
+        rootTypeName.name = "_root_t";
 
         Xsd::Type& type = _output.types.append(rootTypeName, Xsd::Type());
         type.kind = Xsd::Type::ElementKind;
@@ -101,6 +102,7 @@ private:
         Xml::Element xsd;
         HashMap<String, String> prefixToNamespaceMap;
         HashMap<String, String> namespaceToPrefixMap;
+        String targetNamespace;
     };
 
     struct NamespaceData
@@ -137,13 +139,13 @@ private:
     String _path;
     HashMap<Namespace, NamespaceData> _namespaces;
     String _error;
-    HashMap<String, Group> _groups;
+    HashMap<Xsd::Name, Group> _groups;
 
 private:
 
     bool resolveElementRefs()
     {
-        for (HashMap<String, Xsd::Type>::Iterator i = _output.types.begin(), end = _output.types.end(); i != end; ++i)
+        for (HashMap<Xsd::Name, Xsd::Type>::Iterator i = _output.types.begin(), end = _output.types.end(); i != end; ++i)
         {
             Xsd::Type& type = *i;
 
@@ -151,18 +153,24 @@ private:
             {
                 Xsd::ElementRef& elementRef = *i;
 
-                if (!elementRef.typeName.startsWith("ref "))
+                if (!elementRef.typeName.name.startsWith("ref "))
                     continue;
 
-                String refName = elementRef.typeName.substr(4);
+                String refName = elementRef.typeName.name.substr(4);
                 const char* n = refName.find(' ');
                 String typeName = refName.substr(n + 1 - (const char*)refName);
                 refName = refName.substr(0, n - (const char*)refName);
+                n = elementRef.typeName.namespace_.find(' ');
+                String refNamespace = elementRef.typeName.namespace_.substr(0, n - (const char*)elementRef.typeName.namespace_);
+                String typeNamespace = elementRef.typeName.namespace_.substr(n + 1- (const char*)elementRef.typeName.namespace_);
 
-                elementRef.name = refName;
-                elementRef.typeName = typeName;
+                elementRef.name.name = refName;
+                elementRef.name.namespace_ = refNamespace;
 
-                HashMap<String, Group>::Iterator it = _groups.find(refName);
+                elementRef.typeName.name = typeName;
+                elementRef.typeName.namespace_ = typeNamespace;
+
+                HashMap<Xsd::Name, Group>::Iterator it = _groups.find(elementRef.name);
                 if (it == _groups.end())
                     continue;
 
@@ -183,18 +191,20 @@ private:
             return (_error = String::fromPrintf("Could not load file '%s': %s", (const char*)file, (const char*) parser.getErrorString())), false;
 
         String targetNamespace = getAttribute(xsd, "targetNamespace");
+        _output.targetNamespaces.append(targetNamespace);
 
         _namespaces.append(targetNamespace, NamespaceData());
         NamespaceData& namespaceData = _namespaces.back();
         namespaceData.files.append(file, XsdFileData());
         XsdFileData& xsdFileData = namespaceData.files.back();
-        xsdFileData.xsd = xsd; // todo: swap
+        xsdFileData.xsd = xsd;
+        xsdFileData.targetNamespace = targetNamespace;
         if (!loadXsdFile(namespaceData, xsdFileData))
             return false;
 
-        HashMap<String, String>::Iterator it = xsdFileData.namespaceToPrefixMap.find("http://www.w3.org/2001/XMLSchema");
-        if (it != xsdFileData.namespaceToPrefixMap.end())
-            _output.xmlSchemaNamespacePrefix = *it;
+        //HashMap<String, String>::Iterator it = xsdFileData.namespaceToPrefixMap.find("http://www.w3.org/2001/XMLSchema");
+        //if (it != xsdFileData.namespaceToPrefixMap.end())
+        //    _output.xmlSchemaNamespacePrefix = *it;
 
         return true;
     }
@@ -209,13 +219,17 @@ private:
             if (i.key().startsWith("xmlns:"))
             {
                 String prefix = i.key().substr(6);
-                xsdFileData.prefixToNamespaceMap.append(prefix, *i);
-                xsdFileData.namespaceToPrefixMap.append(*i, prefix);
+                const String& namespace_ = *i;
+                xsdFileData.prefixToNamespaceMap.append(prefix, namespace_);
+                xsdFileData.namespaceToPrefixMap.append(namespace_, prefix);
+                if (_output.namespaceToSuggestedPrefix.find(namespace_) == _output.namespaceToSuggestedPrefix.end())
+                    _output.namespaceToSuggestedPrefix.append(namespace_, prefix);
             }
             else if (i.key() == "xmlns")
             {
-                xsdFileData.prefixToNamespaceMap.append(String(), *i);
-                xsdFileData.namespaceToPrefixMap.append(*i, String());
+                const String& namespace_ = *i;
+                xsdFileData.prefixToNamespaceMap.append(String(), namespace_);
+                xsdFileData.namespaceToPrefixMap.append(namespace_, String());
             }
 
         for (List<Xml::Variant>::Iterator i = position.element->content.begin(); i != position.element->content.end(); ++i)
@@ -244,10 +258,13 @@ private:
                     return (_error = String::fromPrintf("Could not load file '%s': %s", (const char*)schemaLocation, (const char*) parser.getErrorString())), false;
 
                 namespaceData.files.append(schemaLocation, XsdFileData());
-                XsdFileData& xsdFileData = namespaceData.files.back();
-                xsdFileData.xsd = xsd; // todo: swap
+                XsdFileData& includedXsdFileData = namespaceData.files.back();
+                includedXsdFileData.namespaceToPrefixMap = xsdFileData.namespaceToPrefixMap;
+                includedXsdFileData.prefixToNamespaceMap = xsdFileData.prefixToNamespaceMap;
+                includedXsdFileData.targetNamespace = includedXsdFileData.targetNamespace;
+                includedXsdFileData.xsd = xsd;
 
-                if (!loadXsdFile(namespaceData, xsdFileData))
+                if (!loadXsdFile(namespaceData, includedXsdFileData))
                     return false;
             }
             else if (compareXsName(position, element.type, "import"))
@@ -255,7 +272,12 @@ private:
                 String namespace_ = getAttribute(element, "namespace");
 
                 if (namespace_ == "http://www.w3.org/XML/1998/namespace")
+                {
+                    xsdFileData.prefixToNamespaceMap.append("xml", namespace_);
+                    xsdFileData.namespaceToPrefixMap.append(namespace_, "xml");
+                    _output.namespaceToSuggestedPrefix.append(namespace_, "xml");
                     continue;
+                }
 
                 if (_namespaces.contains(namespace_))
                     continue;
@@ -273,53 +295,55 @@ private:
         return true;
     }
 
-    bool compareXsName(const Position& position, const String& fullName, const String& name) const
+    static bool compareXsName(const Position& position, const String& nameWithNamespacePrefix, const String& rh)
     {
-        return compareElementName(position.xsdFileData->namespaceToPrefixMap, fullName, "http://www.w3.org/2001/XMLSchema", name);
-    }
-
-    bool isXsStringName(const Position& position, const String& fullName)
-    {
-        return compareXsName(position, fullName, "normalizedString") || 
-            compareXsName(position, fullName, "string") ||
-            compareXsName(position, fullName, "anyURI") ||
-            compareXsName(position, fullName, "NCName") ||
-            compareXsName(position, fullName, "QName") ||
-            fullName == "xml:lang";
-    }
-
-    Position findGlobalElementByName(const Position& position, const String& name)
-    {
-        String namespace_;
-        String nameWithoutPrefix;
-        if (const char* x = name.find(':'))
+        const char* n = nameWithNamespacePrefix.find(':');
+        if (n)
         {
-            usize n = x - (const char*)name;
-            String namespacePrefix = name.substr(0, n);
-            nameWithoutPrefix = name.substr(n + 1);
+            String namespacePrefix = nameWithNamespacePrefix.substr(0, n - (const char*)nameWithNamespacePrefix);
             HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(namespacePrefix);
             if (it == position.xsdFileData->prefixToNamespaceMap.end())
-                return Position();
-            namespace_ = *it;
+                return false;
+            return *it == "http://www.w3.org/2001/XMLSchema" && String::compare(n + 1, (const char*)rh) == 0;
         }
         else
         {
             HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(String());
             if (it == position.xsdFileData->prefixToNamespaceMap.end())
-            {
-                Position result;
-                result.element = findElementByName(position.xsdFileData->xsd, name);
-                if (result.element)
-                {
-                    result.xsdFileData = position.xsdFileData;
-                    return result;
-                }
-                return Position();
-            }
-            namespace_ = *it;
-            nameWithoutPrefix = name;
+                return false;
+            return *it == "http://www.w3.org/2001/XMLSchema" && nameWithNamespacePrefix == rh;
         }
-        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(namespace_);
+    }
+
+    static bool compareXsName(const Xsd::Name& name, const String& rh)
+    {
+        return name.namespace_ == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
+    }
+
+    static bool isXsStringBaseType(const Xsd::Name& typeName)
+    {
+        if (typeName.namespace_ == "http://www.w3.org/2001/XMLSchema")
+            return typeName.name == "normalizedString" || typeName.name == "string" || typeName.name == "anyURI" || typeName.name == "NCName" || typeName.name == "QName";
+        else if(typeName.namespace_ == "http://www.w3.org/XML/1998/namespace")
+            return typeName.name == "lang";
+        return false;
+    }
+
+    static bool isXsNumericBaseType(const Xsd::Name& typeName)
+    {
+        if (typeName.namespace_ == "http://www.w3.org/2001/XMLSchema")
+            return typeName.name == "nonNegativeInteger" || typeName.name == "positiveInteger" || typeName.name == "integer" ||
+                typeName.name == "int" || typeName.name == "long" || typeName.name == "short" ||
+                typeName.name == "unsignedInt" || typeName.name == "unsignedLong" || typeName.name == "unsignedShort" ||
+                typeName.name == "decimal" ||
+                typeName.name == "double" || typeName.name == "float" || 
+                typeName.name == "boolean";
+        return false;
+    }
+
+    Position findGlobalElementByName(const Position& position, const Xsd::Name& name)
+    {
+        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
         if (it2 == _namespaces.end())
             return Position();
         NamespaceData& namespaceData = *it2;
@@ -327,7 +351,7 @@ private:
         {
             const XsdFileData& fileData = *i;
             Position result;
-            result.element = findElementByName(fileData.xsd, nameWithoutPrefix);
+            result.element = findElementByName(fileData.xsd, name.name);
             if (result.element)
             {
                 result.xsdFileData = &fileData;
@@ -356,12 +380,40 @@ private:
         return findElementByType(position, "http://www.w3.org/2001/XMLSchema", type);
     }
 
-    bool processXsElement(const Position& position, const String& parentTypeName, String& typeName, bool atRoot = false)
+    bool resolveNamespacePrefix(const Position& position, const String& typeNameWithNamespacePrefix, Xsd::Name& result)
     {
-        String substitutionGroup = getAttribute(*position.element, "substitutionGroup");
-        if (!substitutionGroup.isEmpty())
+        const char* n = typeNameWithNamespacePrefix.find(':');
+        if (n)
         {
-            HashMap<String, Group>::Iterator it = _groups.find(substitutionGroup);
+            String namespacePrefix = typeNameWithNamespacePrefix.substr(0, n - (const char*)typeNameWithNamespacePrefix);
+            HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(namespacePrefix);
+            if (it == position.xsdFileData->prefixToNamespaceMap.end())
+                return (_error = String::fromPrintf("Could not resolve namespace prefix '%s'", (const char*)namespacePrefix)), false;
+            result.namespace_ = *it;
+            result.name = typeNameWithNamespacePrefix.substr(namespacePrefix.length() + 1);
+        }
+        else
+        {
+            HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(String());
+            if (it == position.xsdFileData->prefixToNamespaceMap.end())
+                result.namespace_.clear();
+            else
+                result.namespace_ = *it;
+            result.name = typeNameWithNamespacePrefix;
+        }
+        return true;
+    }
+
+    bool processXsElement(const Position& position, const Xsd::Name& parentTypeName, Xsd::Name& typeName, bool atRoot = false)
+    {
+        String substitutionGroupWithNamespacePrefix = getAttribute(*position.element, "substitutionGroup");
+        if (!substitutionGroupWithNamespacePrefix.isEmpty())
+        {
+            Xsd::Name substitutionGroup;
+            if (!resolveNamespacePrefix(position, substitutionGroupWithNamespacePrefix, substitutionGroup))
+                return false;
+
+            HashMap<Xsd::Name, Group>::Iterator it = _groups.find(substitutionGroup);
             Group* group;
             if (it == _groups.end())
                 group = &_groups.append(substitutionGroup, Group());
@@ -369,46 +421,57 @@ private:
                 group = &*it;
 
             Xsd::GroupMember& member = group->members.append(Xsd::GroupMember());
-            member.name = getAttribute(*position.element, "name");
-            member.typeName = getAttribute(*position.element, "type");;
+            member.name.name = getAttribute(*position.element, "name");
+            member.name.namespace_ = position.xsdFileData->targetNamespace;
+            if (!resolveNamespacePrefix(position, getAttribute(*position.element, "type"), member.typeName))
+                return false;
 
              if (!processType(position, member.typeName))
                 return false;
         }
 
         // reference to another element
-        String ref = getAttribute(*position.element, "ref");
-        if (!ref.isEmpty())
+        String refWithNamespacePrefix = getAttribute(*position.element, "ref");
+        if (!refWithNamespacePrefix.isEmpty())
         {
             if (atRoot)
                 return true;
+
+            Xsd::Name ref;
+            if (!resolveNamespacePrefix(position, refWithNamespacePrefix, ref))
+                return false;
+
             Position refPos = findGlobalElementByName(position, ref);
             if (!refPos)
-                return (_error = String::fromPrintf("Could not find type '%s'", (const char*)ref)), false;
-            if (!processXsElement(refPos, String(), typeName))
+                return (_error = String::fromPrintf("Could not find type '%s'", (const char*)ref.name)), false;
+            if (!processXsElement(refPos, Xsd::Name(), typeName))
                 return false;
-            typeName = String("ref ") + ref + " " + typeName;
+            typeName.name = String("ref ") + ref.name + " " + typeName.name;
+            typeName.namespace_ = ref.namespace_ + " " + typeName.namespace_;
             return true;
         }
 
         // typed element
-        typeName = getAttribute(*position.element, "type");
-        if (!typeName.isEmpty())
+        String typeNameWithNamespacePrefix = getAttribute(*position.element, "type");
+        if (!typeNameWithNamespacePrefix.isEmpty())
         {
+            if (!resolveNamespacePrefix(position, typeNameWithNamespacePrefix, typeName))
+                return false;
+
             if (!processType(position, typeName))
                 return false;
 
-            if (isXsStringName(position, typeName))
+            if (isXsStringBaseType(typeName))
             {
                 String name = getAttribute(*position.element, "name");
 
-                typeName = parentTypeName + "_" + name + "_t";
+                typeName.name = parentTypeName.name + "_" + name + "_t";
+                typeName.namespace_ = position.xsdFileData->targetNamespace;
 
                 Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                 type.kind = Xsd::Type::ElementKind;
-                type.baseType = "string";
-                if (!_output.xmlSchemaNamespacePrefix.isEmpty())
-                    type.baseType.prepend(_output.xmlSchemaNamespacePrefix + ":");
+                type.baseType.name = "string";
+                type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
             }
 
             return true;
@@ -421,7 +484,8 @@ private:
         String name = getAttribute(*position.element, "name");
         if (!name.isEmpty())
         {
-            typeName = parentTypeName + "_" + name + "_t";
+            typeName.name = parentTypeName.name + "_" + name + "_t";
+            typeName.namespace_ = position.xsdFileData->targetNamespace;
             for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
             {
                 const Xml::Variant& variant = *i;
@@ -439,31 +503,26 @@ private:
                     return true;
                 }
             }
-            return (_error = String::fromPrintf("Could not find 'xs:element', 'xs:complexType' or 'xs:simpleType' in '%s'", (const char*)position.element->type)), false;
+            return (_error = String::fromPrintf("Could not find 'element', 'complexType' or 'simpleType' in '%s'", (const char*)position.element->type)), false;
         }
 
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
     }
 
-    bool processType(const Position& position, const String& typeName)
+    bool processType(const Position& position, const Xsd::Name& typeName)
     {
-        HashMap<String, Xsd::Type>::Iterator it = _output.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _output.types.find(typeName);
         if (it != _output.types.end())
             return true;
 
-        if (isXsStringName(position, typeName))
+        if (isXsStringBaseType(typeName))
         {
             Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
             type.kind = Xsd::Type::StringKind;
             return true;
         }
 
-        if (compareXsName(position, typeName, "nonNegativeInteger") || compareXsName(position, typeName, "positiveInteger") || compareXsName(position, typeName, "integer") ||
-            compareXsName(position, typeName, "int") || compareXsName(position, typeName, "long") || compareXsName(position, typeName, "short") ||
-            compareXsName(position, typeName, "unsignedInt") || compareXsName(position, typeName, "unsignedLong") || compareXsName(position, typeName, "unsignedShort") ||
-            compareXsName(position, typeName, "decimal") ||
-            compareXsName(position, typeName, "double") || compareXsName(position, typeName, "float") || 
-            compareXsName(position, typeName, "boolean"))
+        if (isXsNumericBaseType(typeName))
         {
             Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
             type.kind = Xsd::Type::BaseKind;
@@ -472,15 +531,12 @@ private:
 
         Position elementPos = findGlobalElementByName(position, typeName);
         if (!elementPos)
-        {
-            elementPos = findGlobalElementByName(position, typeName);
-            return (_error = String::fromPrintf("Could not find type '%s'", (const char*)typeName)), false;
-        }
+            return (_error = String::fromPrintf("Could not find type '%s'", (const char*)typeName.name)), false;
 
         return processTypeElement(elementPos, typeName);
     }
 
-    bool processTypeElement(const Position& position, const String& typeName)
+    bool processTypeElement(const Position& position, const Xsd::Name& typeName)
     {
         const Xml::Element& element = *position.element;
 
@@ -489,9 +545,13 @@ private:
             const Position restriction = findXsElementByType(position, "restriction");
             if (restriction)
             {
-                String base = getAttribute(*restriction.element, "base");
+                String baseWithNamespacePrefix = getAttribute(*restriction.element, "base");
+                Xsd::Name base;
 
-                if (compareXsName(position, base, "normalizedString") || compareXsName(position, base, "string"))
+                if (!resolveNamespacePrefix(position, baseWithNamespacePrefix, base))
+                    return false;
+
+                if (compareXsName(base, "normalizedString") || compareXsName(base, "string"))
                 {
                     List<String> enumEntries;
                     for (List<Xml::Variant>::Iterator i = restriction.element->content.begin(), end = restriction.element->content.end(); i != end; ++i)
@@ -533,14 +593,21 @@ private:
             if (union_)
             {
                 String memberTypesStr = getAttribute(*union_.element, "memberTypes");
-                List<String> memberTypes;
-                memberTypesStr.split(memberTypes, " ");
+                List<String> memberTypesStrList;
+                memberTypesStr.split(memberTypesStrList, " ");
+                List<Xsd::Name> memberTypes;
+                for (List<String>::Iterator i = memberTypesStrList.begin(), end = memberTypesStrList.end(); i != end; ++i)
+                {
+                    memberTypes.append(Xsd::Name());
+                    if (!resolveNamespacePrefix(position, *i, memberTypes.back()))
+                        return false;
+                }
 
                 Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                 type.kind = Xsd::Type::UnionKind;
                 type.memberTypes = memberTypes;
 
-                for (List<String>::Iterator i = memberTypes.begin(), end = memberTypes.end(); i != end; ++i)
+                for (List<Xsd::Name>::Iterator i = memberTypes.begin(), end = memberTypes.end(); i != end; ++i)
                     if (!processType(position, *i))
                         return false;
                 return true;
@@ -552,27 +619,28 @@ private:
 
                 Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                 type.kind = Xsd::Type::ListKind;
-                type.baseType = itemTypeStr;
+                if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
+                    return false;
 
-                if (!processType(position, itemTypeStr))
+                if (!processType(position, type.baseType))
                     return false;
                 return true;
             }
-            return (_error = String::fromPrintf("Could not find 'xs:restriction', 'xs:union', or 'xs:list' in '%s'", (const char*)typeName)), false;
+            return (_error = String::fromPrintf("Could not find 'restriction', 'union', or 'list' in '%s'", (const char*)typeName.name)), false;
         }
 
         else if (compareXsName(position, element.type, "complexType"))
         {
             List<Xsd::AttributeRef> attributes;
             List<Xsd::ElementRef> elements;
-            String baseTypeName;
+            Xsd::Name baseTypeName;
+            uint32 flags = 0;
 
             String mixed = getAttribute(*position.element, "mixed");
             if (mixed == "true")
             {
-                baseTypeName = "string";
-                if (!_output.xmlSchemaNamespacePrefix.isEmpty())
-                    baseTypeName.prepend(_output.xmlSchemaNamespacePrefix + ":");
+                baseTypeName.name = "string";
+                baseTypeName.namespace_ = "http://www.w3.org/2001/XMLSchema";
             }
 
             for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
@@ -592,13 +660,14 @@ private:
                 }
                 else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
                 {
-                    if (!processXsAllEtAl(childPosition, typeName, elements))
+                    if (!processXsAllEtAl(childPosition, typeName, elements, flags))
                         return false;
                 }
                 else if (compareXsName(position, element.type, "choice"))
                 {
                     List<Xsd::ElementRef> choiceElements;
-                    if (!processXsAllEtAl(childPosition, typeName, choiceElements))
+                    uint32 _;
+                    if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
                         return false;
 
                     if (!choiceElements.isEmpty())
@@ -626,58 +695,60 @@ private:
                         const Xml::Element& element = variant.toElement();
                         if (compareXsName(position, element.type, "extension") || compareXsName(position, element.type, "restriction"))
                         {
-                            baseTypeName = getAttribute(element, "base");
+                            if (!resolveNamespacePrefix(position, getAttribute(element, "base"), baseTypeName))
+                                return false;
 
                             if (!processType(position, baseTypeName))
                                 return false;
 
-                            if (compareXsName(position, element.type, "restriction"))
-                                baseTypeName.clear(); // todo: I don't see what we should inherit from the baseType in this case.
-
-                            for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
+                            if (!compareXsName(position, element.type, "restriction")) // todo: proper handling of restrictions
                             {
-                                const Xml::Variant& variant = *i;
-                                if (!variant.isElement())
-                                    continue;
-                                const Xml::Element& element = variant.toElement();
-                                Position childPosition;
-                                childPosition.element = &element;
-                                childPosition.xsdFileData = position.xsdFileData;
+                                for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
+                                {
+                                    const Xml::Variant& variant = *i;
+                                    if (!variant.isElement())
+                                        continue;
+                                    const Xml::Element& element = variant.toElement();
+                                    Position childPosition;
+                                    childPosition.element = &element;
+                                    childPosition.xsdFileData = position.xsdFileData;
 
-                                if (compareXsName(position, element.type, "attribute"))
-                                {
-                                    Xsd::AttributeRef& attribute = attributes.append(Xsd::AttributeRef());
-                                    if (!processXsAttribute(childPosition, attribute))
-                                        return false;
-                                }
-                                else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
-                                {
-                                    if (!processXsAllEtAl(childPosition, typeName, elements))
-                                        return false;
-                                }
-                                else if (compareXsName(position, element.type, "choice"))
-                                {
-                                    List<Xsd::ElementRef> choiceElements;
-                                    if (!processXsAllEtAl(childPosition, typeName, choiceElements))
-                                        return false;
-
-                                    if (!choiceElements.isEmpty())
+                                    if (compareXsName(position, element.type, "attribute"))
                                     {
-                                        Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                                        elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
-                                        elementRef.maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
+                                        Xsd::AttributeRef& attribute = attributes.append(Xsd::AttributeRef());
+                                        if (!processXsAttribute(childPosition, attribute))
+                                            return false;
+                                    }
+                                    else if (compareXsName(position, element.type, "all") || compareXsName(position, element.type, "sequence"))
+                                    {
+                                        if (!processXsAllEtAl(childPosition, typeName, elements, flags))
+                                            return false;
+                                    }
+                                    else if (compareXsName(position, element.type, "choice"))
+                                    {
+                                        List<Xsd::ElementRef> choiceElements;
+                                        uint32 _;
+                                        if (!processXsAllEtAl(childPosition, typeName, choiceElements, _))
+                                            return false;
 
-                                        for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
+                                        if (!choiceElements.isEmpty())
                                         {
-                                            const Xsd::ElementRef& choiceElement = *i;
-                                            Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
-                                            groupMember.name = choiceElement.name;
-                                            groupMember.typeName = choiceElement.typeName;
+                                            Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
+                                            elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
+                                            elementRef.maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
+
+                                            for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
+                                            {
+                                                const Xsd::ElementRef& choiceElement = *i;
+                                                Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
+                                                groupMember.name = choiceElement.name;
+                                                groupMember.typeName = choiceElement.typeName;
+                                            }
                                         }
                                     }
+                                    else
+                                        Console::printf("skipped %s\n", (const char*)element.type);
                                 }
-                                else
-                                    Console::printf("skipped %s\n", (const char*)element.type);
                             }
                         }
                     }
@@ -688,7 +759,7 @@ private:
                 }
                 else if (compareXsName(position, element.type, "anyAttribute"))
                 {
-                    ;
+                    flags |= Xsd::Type::AnyAttributeFlag;
                 }
                 else
                     Console::printf("skipped %s\n", (const char*)element.type);
@@ -699,6 +770,7 @@ private:
             type.baseType = baseTypeName;
             type.attributes.swap(attributes);
             type.elements.swap(elements);
+            type.flags = flags;
             return true;
 
         }
@@ -712,16 +784,20 @@ private:
                 String typeStr = getAttribute(element, "type");
                 if (!typeStr.isEmpty())
                 {
-                    if (!processType(position, typeStr))
+                    Xsd::Name baseType;
+                    if (!resolveNamespacePrefix(position, typeStr, baseType))
+                        return false;
+
+                    if (!processType(position, baseType))
                         return false;
                 
                     Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                     type.kind = Xsd::Type::ElementKind;
-                    type.baseType = typeStr;
+                    type.baseType = baseType;
                 
                     return true;
                 }
-                return (_error = String::fromPrintf("Could not find 'xs:complexType' in '%s'", (const char*)element.type)), false;
+                return (_error = String::fromPrintf("Could not find 'complexType' in '%s'", (const char*)element.type)), false;
             }
         }
         else
@@ -733,29 +809,40 @@ private:
         String ref = getAttribute(*position.element, "ref");
         if (!ref.isEmpty())
         {
-            if (ref == "xml:lang")
+            Xsd::Name refName;
+            if (!resolveNamespacePrefix(position, ref, refName))
+                return false;
+
+            if (refName.name == "lang" && refName.namespace_ == "http://www.w3.org/XML/1998/namespace")
             {
-                if (!processType(position, ref))
+                if (!processType(position, refName))
                     return false;
 
-                attribute.name = "lang";
-                attribute.typeName = ref;
+                attribute.name.name = "lang";
+                attribute.name.namespace_ = position.xsdFileData->targetNamespace;
+                attribute.typeName = refName;
                 attribute.isMandatory = false;
                 return true;
             }
-            const Position refAttribute = findGlobalElementByName(position, ref);
+
+            const Position refAttribute = findGlobalElementByName(position, refName);
             if (!refAttribute)
-                return (_error = String::fromPrintf("Could not find attribute '%s'", (const char*)ref)), false;
+                return (_error = String::fromPrintf("Could not find attribute '%s'", (const char*)refName.name)), false;
             return processXsAttribute(refAttribute, attribute);
         }
 
         String typeName = getAttribute(*position.element, "type");
         if (!typeName.isEmpty())
         {
-            if (!processType(position, typeName))
+            Xsd::Name typeNameResolved;
+            if (!resolveNamespacePrefix(position, typeName, typeNameResolved))
                 return false;
-            attribute.typeName = typeName;
-            attribute.name = getAttribute(*position.element, "name");
+
+            if (!processType(position, typeNameResolved))
+                return false;
+            attribute.typeName = typeNameResolved;
+            attribute.name.name = getAttribute(*position.element, "name");
+            attribute.name.namespace_ = position.xsdFileData->targetNamespace;
             String use = getAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
             attribute.defaultValue = getAttribute(*position.element, "default");
@@ -765,8 +852,10 @@ private:
         String name = getAttribute(*position.element, "name");
         if (!name.isEmpty())
         {
-            attribute.name = name;
-            attribute.typeName = name + "_t";
+            attribute.name.name = name;
+            attribute.name.namespace_ = position.xsdFileData->targetNamespace;
+            attribute.typeName.name = name + "_t";
+            attribute.typeName.namespace_ = position.xsdFileData->targetNamespace;
             String use = getAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
             attribute.defaultValue = getAttribute(*position.element, "default");
@@ -789,13 +878,13 @@ private:
                 }
             }
 
-            return (_error = String::fromPrintf("Could not find 'xs:complexType' or 'xs:simpleType' in '%s'", (const char*)position.element->type)), false;
+            return (_error = String::fromPrintf("Could not find 'complexType' or 'simpleType' in '%s'", (const char*)position.element->type)), false;
         }
 
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
     }
 
-    bool processXsAllEtAl(const Position& position, const String& parentTypeName, List<Xsd::ElementRef>& elements)
+    bool processXsAllEtAl(const Position& position, const Xsd::Name& parentTypeName, List<Xsd::ElementRef>& elements, uint32& flags)
     {
         for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
         {
@@ -805,18 +894,19 @@ private:
             const Xml::Element& element = variant.toElement();
             if (compareXsName(position, element.type, "element"))
             {
-                String typeName;
+                Xsd::Name typeName;
                 Position elementPosition;
                 elementPosition.element = &element;
                 elementPosition.xsdFileData = position.xsdFileData;
                 if (!processXsElement(elementPosition, parentTypeName, typeName))
                     return false;
 
-                if (typeName.isEmpty())
+                if (typeName.name.isEmpty())
                     continue;
 
                 Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                elementRef.name = getAttribute(element, "name");
+                elementRef.name.name = getAttribute(element, "name");
+                elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
                 elementRef.typeName = typeName;
                 // todo: get minOccurs and maxOccurs from referenced element in isRef case?
                 elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
@@ -829,7 +919,8 @@ private:
                 choicePosition.xsdFileData = position.xsdFileData;
             
                 List<Xsd::ElementRef> choiceElements;
-                if (!processXsAllEtAl(choicePosition, parentTypeName,  choiceElements))
+                uint32 _;
+                if (!processXsAllEtAl(choicePosition, parentTypeName,  choiceElements, _))
                     return false;
 
                 if (!choiceElements.isEmpty())
@@ -853,12 +944,14 @@ private:
                 choicePosition.element = &element;
                 choicePosition.xsdFileData = position.xsdFileData;
             
-                if (!processXsAllEtAl(choicePosition, parentTypeName,  elements))
+                if (!processXsAllEtAl(choicePosition, parentTypeName,  elements, flags))
                     return false;
             }
             else if (compareXsName(position, element.type, "any"))
             {
-                ;
+                 String processContents = getAttribute(element, "processContents");
+                 if (processContents == "skip" || processContents == "lax")
+                     flags |= Xsd::Type::SkipProcessContentsFlag;
             }
             else
                 Console::printf("skipped %s\n", (const char*)element.type);
@@ -890,17 +983,18 @@ private:
                         elementPosition.element = &element;
                         elementPosition.xsdFileData = position.xsdFileData;
 
-                        String typeName;
-                        if (!processXsElement(elementPosition, String(), typeName, true))
+                        Xsd::Name typeName;
+                        if (!processXsElement(elementPosition, Xsd::Name(), typeName, true))
                             return false;
 
-                        if (typeName.isEmpty())
+                        if (typeName.name.isEmpty())
                             continue;
 
                         if (&namespaceData == &*_namespaces.begin())
                         {
                             Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                            elementRef.name = getAttribute(element, "name");
+                            elementRef.name.name = getAttribute(element, "name");
+                            elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
                             elementRef.typeName = typeName;
                             elementRef.minOccurs = 1;
                             elementRef.maxOccurs = 1;

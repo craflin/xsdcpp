@@ -14,8 +14,9 @@ struct Position;
 struct ElementInfo;
 
 typedef void* (*get_element_field_t)(void*);
-typedef void (*set_attribute_t)(void*, const Position&, const std::string& value);
+typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
 typedef void (*set_attribute_default_t)(void*);
+typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
 
 struct ChildElementInfo
 {
@@ -39,7 +40,9 @@ struct ElementInfo
     enum ElementFlag
     {
         Level1Flag = 0x01,
-        ReadTextFlag = 0x02
+        ReadTextFlag = 0x02,
+        SkipProcessingFlag = 0x04,
+        AnyAttributeFlag = 0x08,
     };
     
     size_t flags;
@@ -49,6 +52,7 @@ struct ElementInfo
     const AttributeInfo* attributes;
     size_t attributesCount;
     const ElementInfo* base;
+    set_any_attribute_t setOtherAttribute;
 };
 
 struct ElementContext
@@ -90,6 +94,8 @@ struct Context
 {
     Position pos;
     Token token;
+    const char** namespaces;
+    std::unordered_map<std::string, size_t> namespacePrefixToIndex;
 };
 
 void skipSpace(Position& pos)
@@ -173,7 +179,7 @@ void throwVerificationException(const Position& pos, const std::string& error)
     throw std::runtime_error(s.str());
 }
 
-bool skipText(Position& pos)
+void skipText(Position& pos)
 {
     for (;;)
     {
@@ -203,7 +209,7 @@ bool skipText(Position& pos)
                 skipSpace(pos);
                 continue;
             }
-            return true;
+            return;
         }
     }
 }
@@ -322,7 +328,7 @@ std::string stripComments(const char* str, size_t len)
     }
 }
 
-bool readToken(Context& context)
+void readToken(Context& context)
 {
     skipSpace(context.pos);
     context.token.pos = context.pos;
@@ -333,21 +339,21 @@ bool readToken(Context& context)
         {
             context.token.type = Token::endTagBeginType;
             context.pos.pos += 2;
-            return true;
+            return;
         }
         context.token.type = Token::startTagBeginType;
         ++context.pos.pos;
-        return true;
+        return;
     case '>':
         context.token.type = Token::tagEndType;
         ++context.pos.pos;
-        return true;
+        return;
     case '\0':
         throwSyntaxException(context.pos, "Unexpected end of file");
     case '=':
         context.token.type = Token::equalsSignType;
         ++context.pos.pos;
-        return true;
+        return;
     case '"':
     case '\'': {
         char endChars[4] = "x\r\n";
@@ -360,14 +366,14 @@ bool readToken(Context& context)
         context.token.value = unescapeString(context.pos.pos + 1, end - context.pos.pos - 1);
         context.token.type = Token::stringType;
         context.pos.pos = end + 1;
-        return true;
+        return;
     }
     case '/':
         if (context.pos.pos[1] == '>')
         {
             context.token.type = Token::emptyTagEndType;
             context.pos.pos += 2;
-            return true;
+            return;
         }
         // no break
     default: // attribute or tag name
@@ -380,7 +386,39 @@ bool readToken(Context& context)
             context.token.value = std::string(context.pos.pos, end - context.pos.pos);
             context.token.type = Token::nameType;
             context.pos.pos = end;
-            return true;
+            return;
+        }
+    }
+}
+
+void skipTextAndSubElements(Context& context, const std::string& elementName)
+{
+    for (;;)
+    {
+        skipText(context.pos);
+        Position posBackup = context.pos;
+        readToken(context);
+        switch (context.token.type)
+        {
+        case Token::startTagBeginType:
+            readToken(context);
+            if (context.token.type == Token::nameType)
+            {
+                std::string elementName = std::move(context.token.value);
+                skipTextAndSubElements(context, elementName);
+                readToken(context);
+            }
+            break;
+        case Token::endTagBeginType:
+            readToken(context);
+            if (context.token.type == Token::nameType && context.token.value == elementName)
+            {
+                context.pos = posBackup;
+                return;
+            }
+            break;
+        default:
+            break;
         }
     }
 }
@@ -434,7 +472,7 @@ void checkElement(Context& context, const ElementContext& elementContext)
                 }
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, const std::string& name, std::string&& value)
+void setAttribute(Context& context, ElementContext& elementContext, std::string&& name, std::string&& value)
 {
     uint64_t attribute = 1;
     for (const ElementInfo* i = elementContext.info; i; i = i->base)
@@ -448,8 +486,37 @@ void setAttribute(Context& context, ElementContext& elementContext, const std::s
                     a->setAttribute(elementContext.element, context.pos, std::move(value));
                     return;
                 }
-    if (elementContext.info->flags & ElementInfo::Level1Flag && (name.find(':') != std::string::npos || name == "xmlns"))
-        return;
+    if (elementContext.info->flags & ElementInfo::Level1Flag)
+    {
+        if (name.compare(0, 5, "xmlns") == 0 && (name.size() == 5 || name.c_str()[5] == ':'))
+        {
+            std::string namespacePrefix;
+            if (name.size() > 6)
+                namespacePrefix = name.substr(6);
+            size_t namespaceIndex = 0;
+            for (const char** ns = context.namespaces; *ns; ++ns, ++namespaceIndex)
+                if (value == *ns)
+                {
+                    context.namespacePrefixToIndex.insert(std::pair<std::string, size_t>(namespacePrefix, namespaceIndex));
+                    return;
+                }
+            throwVerificationException(context.pos, "Unknown namespace '" + value + "'");
+        }
+        size_t n = name.find(':');
+        if (n != std::string::npos && name.compare(n + 1, std::string::npos, "noNamespaceSchemaLocation") == 0)
+        {
+            std::unordered_map<std::string, size_t>::const_iterator it = context.namespacePrefixToIndex.find(name.substr(0, n));
+            if (it != context.namespacePrefixToIndex.end() && strcmp(context.namespaces[it->second], "http://www.w3.org/2001/XMLSchema-instance") == 0)
+                return;
+        }
+    }
+    for (const ElementInfo* i = elementContext.info; i; i = i->base)
+        if (i->flags & ElementInfo::AnyAttributeFlag)
+        {
+            i->setOtherAttribute(elementContext.element, std::move(name), std::move(value));
+            return;
+        }
+
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
@@ -511,20 +578,28 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.token.type != Token::stringType)
                 throwSyntaxException(context.token.pos, "Expected string");
             std::string& attributeValue = context.token.value;
-            setAttribute(context, elementContext, attributeName, std::move(attributeValue));
+            setAttribute(context, elementContext, std::move(attributeName), std::move(attributeValue));
             continue;
         }
     }
     checkAttributes(context, elementContext);
     for (;;)
     {
-        const char* start = context.pos.pos;
-        skipText(context.pos);
-        if (context.pos.pos != start && elementContext.info->flags & ElementInfo::ReadTextFlag)
+        if (elementContext.info->flags & ElementInfo::ReadTextFlag)
         {
-            std::string text = stripComments(start, context.pos.pos - start);
-            addText(context, elementContext, std::move(text));
+            const char* start = context.pos.pos;
+            if (elementContext.info->flags & ElementInfo::SkipProcessingFlag)
+                skipTextAndSubElements(context, elementName);
+            else
+                skipText(context.pos);
+            if (context.pos.pos != start)
+            {
+                std::string text = stripComments(start, context.pos.pos - start);
+                addText(context, elementContext, std::move(text));
+            }
         }
+        else
+            skipText(context.pos);
         
         readToken(context);
         if (context.token.type == Token::endTagBeginType)
@@ -548,11 +623,12 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     checkElement(context, elementContext);
 }
 
-void parse(const char* data, ElementContext& elementContext)
+void parse(const char* data, const char** namespaces, ElementContext& elementContext)
 {
     Context context;
     context.pos.pos = context.pos.lineStart = data;
     context.pos.line = 1;
+    context.namespaces = namespaces;
     
     skipSpace(context.pos);
     while (*context.pos.pos == '<' && context.pos.pos[1] == '?')
@@ -618,6 +694,13 @@ double toType<double>(const Position& pos, const std::string& value) { return to
 template <>
 float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
 template <>
-bool toType<bool>(const Position& pos, const std::string& value) { return toType<bool>(pos, value,  "Expected boolean value"); }
+bool toType<bool>(const Position& pos, const std::string& value)
+{
+    std::stringstream ss(value);
+    bool result;
+    if (!(ss >> std::boolalpha >> result))
+         throwVerificationException(pos, "Expected boolean value");
+    return result;
+}
 
 }

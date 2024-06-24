@@ -16,7 +16,7 @@ void fixUnusedToTypeWarning()
     toType<float>(Position(), std::string());
     toType<bool>(Position(), std::string());
     ElementContext elementContext;
-    parse(nullptr, elementContext);
+    parse(nullptr, nullptr, elementContext);
 }
 
 TEST(Parser, unescapeString)

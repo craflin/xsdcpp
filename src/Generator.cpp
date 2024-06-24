@@ -10,7 +10,7 @@
 
 namespace {
 
-String toCppTypeIdentifier(const String& str)
+String toCppIdentifier(const String& str)
 {
     String result = str;
     for (char* i = result; *i; ++i)
@@ -20,24 +20,33 @@ String toCppTypeIdentifier(const String& str)
         else if (!String::isAlphanumeric(*i))
             *i = '_';
     }
-    if (String::isDigit(*(char*)result))
+    if (result.isEmpty() || String::isDigit(*(const char*)result))
         result.prepend("_");
     if (result == "union" || result == "enum" || result == "linux")
         result.append("_");
     return result;
 }
 
-String stripNamespacePrefix(const String& str)
+
+String toCppFieldIdentifier(const Xsd::Name& name)
 {
-    const char* x = str.find(':');
-    if (!x)
-        return str;
-    return str.substr(x - (const char*)str + 1);
+    return toCppIdentifier(name.name);
 }
 
-String toCppFieldIdentifier(const String& str)
+String toCStringLiteral(const String& str)
 {
-    return toCppTypeIdentifier(stripNamespacePrefix(str));
+    String result;
+    result.reserve(str.length() + 4);
+    result.append("\"");
+    // todo: replace stuff
+    result.append(str);
+    result.append("\"");
+    return result;
+}
+
+bool compareXsName(const Xsd::Name& name, const String& rh)
+{
+    return name.namespace_ == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
 }
 
 class Generator
@@ -54,7 +63,7 @@ public:
 
     bool process()
     {
-        String cppName = toCppTypeIdentifier(_xsd.name);
+        String cppName = toCppIdentifier(_xsd.name);
 
         _cppOutput.append("");
         _cppOutput.append(String("#include \"") + cppName + ".hpp\"");
@@ -64,6 +73,17 @@ public:
         _cppOutput.append("");
 
         _cppOutput.append(String("using namespace ") + cppName + ";");
+        _cppOutput.append("");
+
+        _cppOutput.append("const char* _namespaces[] = {");
+        for (HashSet<String>::Iterator i = _xsd.targetNamespaces.begin(), end = _xsd.targetNamespaces.end(); i != end; ++i)
+            _cppOutput.append(String("    ") + toCStringLiteral(*i) + ",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema-instance") == _xsd.targetNamespaces.end())
+            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema-instance\",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema") == _xsd.targetNamespaces.end())
+            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema\",");
+        _cppOutput.append("    nullptr");
+        _cppOutput.append("};");
         _cppOutput.append("");
 
         _hppOutput.append("");
@@ -79,7 +99,7 @@ public:
         if (!processType(_xsd.rootType, rootTypeCppName, 0))
             return false;
 
-        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(_xsd.rootType);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(_xsd.rootType);
         Xsd::Type& rootType = *it;
 
         for (List<Xsd::ElementRef>::Iterator i = rootType.elements.begin(), end = rootType.elements.end(); i != end; ++i)
@@ -130,7 +150,7 @@ public:
             _cppOutput.append("    ElementContext elementContext;");
             _cppOutput.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
             _cppOutput.append("    elementContext.element = &rootElement;");
-            _cppOutput.append("    parse(data.c_str(), elementContext);");
+            _cppOutput.append("    parse(data.c_str(), _namespaces, elementContext);");
             _cppOutput.append(String("    output = std::move(rootElement.") + elementCppName + ");");
             _cppOutput.append("}");
             _cppOutput.append("");
@@ -156,35 +176,36 @@ private:
     const Xsd& _xsd;
     List<String>& _cppOutput;
     List<String>& _hppOutput;
-    HashMap<String, String> _generatedTypes;
+    HashMap<Xsd::Name, String> _generatedTypes;
     String _error;
 
 private:
-    bool compareXsName(const String& fullName, const String& name) const
+    String toCppTypeIdentifier(const Xsd::Name& name)
     {
-        if (_xsd.xmlSchemaNamespacePrefix.isEmpty())
-            return fullName == name;
-
-        return fullName.startsWith(_xsd.xmlSchemaNamespacePrefix) && ((const char*)fullName)[_xsd.xmlSchemaNamespacePrefix.length()] &&
-            String::compare((const char*)fullName + _xsd.xmlSchemaNamespacePrefix.length() + 1, (const char*)name) == 0;
+        if (name.namespace_ == _xsd.targetNamespaces.front())
+            return toCppIdentifier(name.name);
+        HashMap<String, String>::Iterator it = _xsd.namespaceToSuggestedPrefix.find(name.namespace_);
+        if (it != _xsd.namespaceToSuggestedPrefix.end())
+            return toCppIdentifier(*it + "_" + name.name);
+        return toCppIdentifier(name.name);
     }
 
-    usize getChildrenCount(const String& typeName) const
+    usize getChildrenCount(const Xsd::Name& typeName) const
     {
-        if (typeName.isEmpty())
+        if (typeName.name.isEmpty())
             return 0;
-        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
         if (it == _xsd.types.end())
             return 0;
         const Xsd::Type& type = *it;
         return type.elements.size() + getChildrenCount(type.baseType);
     }
 
-    usize getMandatoryChildrenCount(const String& typeName) const
+    usize getMandatoryChildrenCount(const Xsd::Name& typeName) const
     {
-        if (typeName.isEmpty())
+        if (typeName.name.isEmpty())
             return 0;
-        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
         if (it == _xsd.types.end())
             return 0;
         const Xsd::Type& type = *it;
@@ -198,33 +219,62 @@ private:
         return count + getMandatoryChildrenCount(type.baseType);
     }
 
-    usize getAttributesCount(const String& typeName) const
+    usize getAttributesCount(const Xsd::Name& typeName) const
     {
-        if (typeName.isEmpty())
+        if (typeName.name.isEmpty())
             return 0;
-        HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
         if (it == _xsd.types.end())
             return 0;
         const Xsd::Type& type = *it;
         return type.attributes.size() + getAttributesCount(type.baseType);
     }
 
-    bool getReadText(const String& typeName) const
+    enum ReadTextMode
     {
-        if (typeName.isEmpty())
+        SkipMode,
+        ReadAndProcessMode,
+        SkipProcessingMode,
+    };
+
+    bool isSkipProcessContentsFlagSet(const Xsd::Name& typeName) const 
+    {
+        if (typeName.name.isEmpty())
             return false;
-        HashMap<String, String>::Iterator it = _generatedTypes.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        if (it2 == _xsd.types.end())
+            return false;
+        if (it2->flags & Xsd::Type::SkipProcessContentsFlag)
+            return true;
+        const Xsd::Type& type = *it2;
+        return isSkipProcessContentsFlagSet(type.baseType);
+    }
+
+    bool isBaseTypeString(const Xsd::Name& typeName) const
+    {
+        if (typeName.name.isEmpty())
+            return false;
+        HashMap<Xsd::Name, String>::Iterator it = _generatedTypes.find(typeName);
         if (it != _generatedTypes.end())
         {
             const String& cppTypeName = *it;
             if (cppTypeName == "xsd::string")
                 return true;
         }
-        HashMap<String, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
         if (it2 == _xsd.types.end())
             return false;
         const Xsd::Type& type = *it2;
-        return getReadText(type.baseType);
+        return isBaseTypeString(type.baseType);
+    }
+
+    ReadTextMode getReadTextMode(const Xsd::Name& typeName) const
+    {
+        if (typeName.name.isEmpty() || !isBaseTypeString(typeName))
+            return SkipMode;
+        if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
+            return SkipProcessingMode;
+        return ReadAndProcessMode;
     }
 
     static String toCStringLiteral(const String& str)
@@ -242,7 +292,7 @@ private:
     {
         if (type.kind == Xsd::Type::SimpleRefKind)
         {
-            HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(type.baseType);
+            HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(type.baseType);
             if (it != _xsd.types.end())
                 return resolveFinalType(*it);
         }
@@ -263,18 +313,18 @@ private:
         return defaultValue;
     }
 
-    bool processType(const String& typeName, String& cppName, usize level)
+    bool processType(const Xsd::Name& typeName, String& cppName, usize level)
     {
-        HashMap<String, String>::Iterator it = _generatedTypes.find(typeName);
+        HashMap<Xsd::Name, String>::Iterator it = _generatedTypes.find(typeName);
         if (it != _generatedTypes.end())
         {
             cppName = *it;
             return true;
         }
 
-        HashMap<String, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
         if (it2 == _xsd.types.end())
-            return _error = String::fromPrintf("Type '%s' not found", (const char*)typeName), false;
+            return _error = String::fromPrintf("Type '%s' not found", (const char*)typeName.name), false;
         Xsd::Type& type = *it2;
 
         if (type.kind == Xsd::Type::StringKind)
@@ -352,7 +402,7 @@ private:
                 return true;
             }
 
-            return _error = String::fromPrintf("Base type '%s' not supported", (const char*)typeName), false;
+            return _error = String::fromPrintf("Base type '%s' not supported", (const char*)typeName.name), false;
         }
 
         if (type.kind == Xsd::Type::SimpleRefKind)
@@ -400,7 +450,7 @@ private:
             _hppOutput.append(String("enum class ") + cppName);
             _hppOutput.append("{");
             for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-                _hppOutput.append(String("    ") + toCppFieldIdentifier(*i) + ",");
+                _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
             _hppOutput.append("};");
             _hppOutput.append("");
 
@@ -420,7 +470,7 @@ private:
             _generatedTypes.append(typeName, cppName);
 
             String baseCppName;
-            if (!type.baseType.isEmpty())
+            if (!type.baseType.name.isEmpty())
                 if (!processType(type.baseType, baseCppName, level + 1))
                     return false;
 
@@ -433,6 +483,8 @@ private:
                     return false;
                 structFields.append(attributeCppName + " " + toCppFieldIdentifier(attributeRef.name));
             }
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                structFields.append("xsd::vector<xsd::any_attribute> other_attributes");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
                 const Xsd::ElementRef& elementRef = *i;
@@ -522,7 +574,7 @@ private:
                         String elementCppName;
                         if (!processType(elementRef.typeName, elementCppName, level + 1))
                             return false;
-                        _cppOutput.append(String("    {\"") + stripNamespacePrefix(elementRef.name) + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                        _cppOutput.append(String("    {\"") + elementRef.name.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
                     }
                     else for (List<Xsd::GroupMember>::Iterator i = elementRef.groupMembers.begin(), end = elementRef.groupMembers.end(); i != end; ++i)
                     {
@@ -530,7 +582,7 @@ private:
                         String memberCppName;
                         if (!processType(member.typeName, memberCppName, level + 1))
                             return false;
-                        _cppOutput.append(String("    {\"") + stripNamespacePrefix(member.name) + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(member.name) + ", &_" + memberCppName + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                        _cppOutput.append(String("    {\"") + member.name.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(member.name) + ", &_" + memberCppName + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
                     }
                 }
                 _cppOutput.append("    {nullptr}\n};");
@@ -543,12 +595,12 @@ private:
                 if (!processType(attributeRef.typeName, attributeTypeCppName, level + 1))
                     return false;
 
-                HashMap<String, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
+                HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
                 if (it == _xsd.types.end())
                     return false;
                 Xsd::Type& type = *it;
                 const Xsd::Type& finalType = resolveFinalType(type);
-                if (finalType.kind == Xsd::Type::StringKind)
+                if (finalType.kind == Xsd::Type::StringKind || type.kind == Xsd::Type::UnionKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position&, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = std::move(value); }");
                 else
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element, const Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = toType<" + attributeTypeCppName + ">(pos, value); }");
@@ -556,6 +608,8 @@ private:
                 if (!attributeRef.isMandatory && !attributeRef.defaultValue.isEmpty())
                     _cppOutput.append(String("void default_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + "(" + cppName + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeTypeCppName, finalType, attributeRef.defaultValue) + "; }");
             }
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                _cppOutput.append(String("void any_") + cppName + "(" + cppName + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
@@ -569,7 +623,7 @@ private:
                     if (!processType(attributeRef.typeName, attributeCppName, level + 1))
                         return false;
                     String setDefault = (attributeRef.isMandatory || attributeRef.defaultValue.isEmpty()) ? String("nullptr") : String("(set_attribute_default_t)&default_") + cppName + "_" + toCppTypeIdentifier(attributeRef.name);
-                    _cppOutput.append(String("    {\"") + attributeRef.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                    _cppOutput.append(String("    {\"") + attributeRef.name.name + "\", (set_attribute_t)&set_" + cppName + "_" + toCppTypeIdentifier(attributeRef.name) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
                 _cppOutput.append("    {nullptr}\n};");
             }
@@ -580,14 +634,27 @@ private:
             String flags = "0";
             if (level == 1)
                 flags.append("|ElementInfo::Level1Flag");
-            if (getReadText(typeName))
+            if (type.flags & Xsd::Type::AnyAttributeFlag)
+                flags.append("|ElementInfo::AnyAttributeFlag");
+            switch (getReadTextMode(typeName))
+            {
+            case SkipMode:
+                break;
+            case ReadAndProcessMode:
                 flags.append("|ElementInfo::ReadTextFlag");
+                break;
+            case SkipProcessingMode:
+                flags.append("|ElementInfo::ReadTextFlag|ElementInfo::SkipProcessingFlag");
+                break;
+            }
 
             if (baseCppName == "xsd::string")
                 baseCppName.clear();
 
             _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flags + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
-                + ",  " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") + " };");
+                + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") 
+                + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(set_any_attribute_t)&any_") + cppName : String("nullptr"))
+                + " };");
             _cppOutput.append("");
 
             return true;
@@ -607,7 +674,7 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, String& error)
     if (!generator.process())
         return (error = generator.getError()), false;
 
-    String cppName = toCppTypeIdentifier(xsd.name);
+    String cppName = toCppIdentifier(xsd.name);
 
     {
         String outputFilePath = outputDir + "/" + cppName + ".hpp";
