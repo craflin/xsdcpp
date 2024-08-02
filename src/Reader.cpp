@@ -926,8 +926,8 @@ private:
                 if (!choiceElements.isEmpty())
                 {
                     Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                    elementRef.minOccurs = getAttribute(element, "minOccurs", "1").toUInt();
-                    elementRef.maxOccurs = getAttribute(element, "maxOccurs", "1").toUInt();
+                    elementRef.minOccurs = getAttribute(element, "minOccurs", getAttribute(*position.element, "minOccurs", "1")).toUInt();
+                    elementRef.maxOccurs = getAttribute(element, "maxOccurs", getAttribute(*position.element, "maxOccurs", "1")).toUInt();
 
                     for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                     {

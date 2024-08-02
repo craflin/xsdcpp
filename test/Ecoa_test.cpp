@@ -57,6 +57,26 @@ TEST(Ecoa_implementation, booleanAttribute)
     ecoa_implementation_2_0::load_data(data, componentImplementation);
 }
 
+TEST(Ecoa_implementation, sequenceMaxOccurs)
+{
+    std::string data = R"(<?xml version="1.0" encoding="UTF-8"?>
+<componentImplementation xmlns="http://www.ecoa.technology/implementation-2.0" componentDefinition="UnitTestComponentDefinition">
+  <eventLink>
+    <senders>
+      <moduleInstance instanceName="SenderModule1_Instance" operationName="EventSent1"/>
+      <moduleInstance instanceName="SenderModule2_Instance" operationName="EventSent2"/>
+    </senders>
+    <receivers>
+      <moduleInstance instanceName="ReceiverModuleInstance" operationName="EventReceived"/>
+    </receivers>
+  </eventLink>
+</componentImplementation>)";
+    ecoa_implementation_2_0::ComponentImplementation componentImplementation;
+    ecoa_implementation_2_0::load_data(data, componentImplementation);
+
+    EXPECT_EQ(componentImplementation.eventLink.back().senders->moduleInstance.size(), 2);
+}
+
 TEST(Ecoa_componentType, Constructor)
 {
     sca_1_1_cd06_subset_2_0::ComponentType componentType;
