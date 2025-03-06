@@ -39,6 +39,10 @@ class xsdcppConan(ConanFile):
     def layout(self):
         cmake_layout(self)
 
+    def package_id(self):
+        del self.info.settings.compiler
+        del self.info.settings.build_type
+
     def package_info(self):
         self.cpp_info.bindirs = ['.']
         self.cpp_info.set_property("cmake_find_mode", "none")
