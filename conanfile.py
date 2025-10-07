@@ -19,12 +19,11 @@ class xsdcppConan(ConanFile):
 
     def build_requirements(self):
         self.tool_requires("cmake/3.30.1")
-        self.tool_requires("ninja/1.12.1")
 
     def generate(self):
         ms = VirtualBuildEnv(self)
         ms.generate()
-        tc = CMakeToolchain(self, generator='Ninja')
+        tc = CMakeToolchain(self)
         tc.generate()
 
     def build(self):
