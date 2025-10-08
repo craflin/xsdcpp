@@ -31,20 +31,6 @@ String getXmlAttribute(const Xml::Element& element, const String& name, const St
     return *it;
 }
 
-const Xml::Element* findXmlElementByNameAttribute(const Xml::Element& parent, const String& name)
-{
-    for (List<Xml::Variant>::Iterator i = parent.content.begin(), end = parent.content.end(); i != end; ++i)
-    {
-        const Xml::Variant& variant = *i;
-        if (!variant.isElement())
-            continue;
-        const Xml::Element& element = variant.toElement();
-        if (getXmlAttribute(element, "name") == name)
-            return &element;
-    }
-    return nullptr;
-}
-
 class Reader
 {
 public:
@@ -308,7 +294,9 @@ private:
     static bool isXsStringBaseType(const Xsd::Name& typeName)
     {
         if (typeName.namespace_ == "http://www.w3.org/2001/XMLSchema")
-            return typeName.name == "normalizedString" || typeName.name == "string" || typeName.name == "anyURI" || typeName.name == "NCName" || typeName.name == "QName";
+            return typeName.name == "normalizedString" || typeName.name == "string" || 
+            typeName.name == "anySimpleType" || typeName.name == "anyURI" || typeName.name == "NCName" || typeName.name == "QName" ||
+            typeName.name == "dateTime" || typeName.name == "base64Binary";
         else if(typeName.namespace_ == "http://www.w3.org/XML/1998/namespace")
             return typeName.name == "lang";
         return false;
@@ -326,7 +314,7 @@ private:
         return false;
     }
 
-    Position findGlobalElementByName(const Position& position, const Xsd::Name& name)
+    Position findGlobalTypeByName(const Position& position, const Xsd::Name& name)
     {
         HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
         if (it2 == _namespaces.end())
@@ -335,16 +323,55 @@ private:
         for (HashMap<String, XsdFileData>::Iterator i = namespaceData.files.begin(), end = namespaceData.files.end(); i != end; ++i)
         {
             const XsdFileData& fileData = *i;
-            Position result;
-            result.element = findXmlElementByNameAttribute(fileData.xsd, name.name);
-            if (result.element)
+
+            for (List<Xml::Variant>::Iterator i = fileData.xsd.content.begin(), end = fileData.xsd.content.end(); i != end; ++i)
             {
-                result.xsdFileData = &fileData;
-                return result;
+                const Xml::Variant& variant = *i;
+                if (!variant.isElement())
+                    continue;
+                const Xml::Element& element = variant.toElement();
+                if (getXmlAttribute(element, "name") == name.name)
+                {
+                    Position result;
+                    result.element = &element;
+                    result.xsdFileData = &fileData;
+                    if (!compareXsName(result, element.type, "element"))
+                        return result;
+                }
             }
         }
         return Position();
     }
+
+    Position findGlobalRefByName(const Position& position, const String& xsElementNameWithoutPrefix, const Xsd::Name& name)
+    {
+        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
+        if (it2 == _namespaces.end())
+            return Position();
+        NamespaceData& namespaceData = *it2;
+        for (HashMap<String, XsdFileData>::Iterator i = namespaceData.files.begin(), end = namespaceData.files.end(); i != end; ++i)
+        {
+            const XsdFileData& fileData = *i;
+
+            for (List<Xml::Variant>::Iterator i = fileData.xsd.content.begin(), end = fileData.xsd.content.end(); i != end; ++i)
+            {
+                const Xml::Variant& variant = *i;
+                if (!variant.isElement())
+                    continue;
+                const Xml::Element& element = variant.toElement();
+                if (getXmlAttribute(element, "name") == name.name)
+                {
+                    Position result;
+                    result.element = &element;
+                    result.xsdFileData = &fileData;
+                    if (compareXsName(result, element.type, xsElementNameWithoutPrefix))
+                        return result;
+                }
+            }
+        }
+        return Position();
+    }
+
 
     Position findXmlElementByNamespaceAndXmlType(const Position& position, const String& namespace_, const String& type)
     {
@@ -426,9 +453,9 @@ private:
             if (!resolveNamespacePrefix(position, refWithNamespacePrefix, ref))
                 return false;
 
-            Position refPos = findGlobalElementByName(position, ref);
+            Position refPos = findGlobalRefByName(position, "element", ref);
             if (!refPos)
-                return (_error = String::fromPrintf("Could not find type '%s'", (const char*)ref.name)), false;
+                return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)ref.name)), false;
             if (!processXsElement(refPos, Xsd::Name(), typeName))
                 return false;
             typeName.name = String("ref ") + ref.name + " " + typeName.name;
@@ -514,7 +541,7 @@ private:
             return true;
         }
 
-        Position elementPos = findGlobalElementByName(position, typeName);
+        Position elementPos = findGlobalTypeByName(position, typeName);
         if (!elementPos)
             return (_error = String::fromPrintf("Could not find type '%s'", (const char*)typeName.name)), false;
 
@@ -600,11 +627,16 @@ private:
             const Position list = findXsElementByXmlType(position, "list");
             if (list)
             {
-                String itemTypeStr = getXmlAttribute(*list.element, "itemType");
-
                 Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                 type.kind = Xsd::Type::ListKind;
-                if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
+
+                String itemTypeStr = getXmlAttribute(*list.element, "itemType");
+                if (itemTypeStr.isEmpty())
+                {
+                    type.baseType.name  = "anySimpleType";
+                    type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                }
+                else if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
                     return false;
 
                 if (!processType(position, type.baseType))
@@ -810,7 +842,7 @@ private:
                 return true;
             }
 
-            const Position refAttribute = findGlobalElementByName(position, refName);
+            const Position refAttribute = findGlobalRefByName(position, "attribute", refName);
             if (!refAttribute)
                 return (_error = String::fromPrintf("Could not find attribute '%s'", (const char*)refName.name)), false;
             return processXsAttribute(refAttribute, attribute);
