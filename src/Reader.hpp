@@ -13,12 +13,14 @@ struct Xsd
         String namespace_;
     };
 
-    struct AttributeRef
+    struct AttributeRef // todo: rename to Attribute
     {
         Name name;
         Name typeName;
         bool isMandatory;
         String defaultValue;
+
+        AttributeRef() : isMandatory(false) {}
     };
 
     struct GroupMember
@@ -27,13 +29,16 @@ struct Xsd
         Name typeName;
     };
 
-    struct ElementRef
+    struct ElementRef // todo: rename to Element
     {
         Name name;
         uint minOccurs;
         uint maxOccurs;
         Name typeName;
-        List<GroupMember> groupMembers;
+
+        Name refName; // used by the reader for substituion groups
+
+        ElementRef() : minOccurs(1), maxOccurs(1) {}
     };
 
     struct Type
@@ -47,6 +52,7 @@ struct Xsd
             ElementKind,
             UnionKind,
             ListKind,
+            SubstitutionGroupKind,
         };
         Kind kind;
 
@@ -60,17 +66,21 @@ struct Xsd
         List<String> enumEntries;
 
         // when ElementKind
-        List<AttributeRef> attributes;
-        List<ElementRef> elements;
         enum Flags
         {
             SkipProcessContentsFlag = 1,
             AnyAttributeFlag = 2,
         };
         uint32 flags;
+        List<AttributeRef> attributes;
+
+        // when ElementKind or SubstitutionGroupKind
+        List<ElementRef> elements;
 
         // when UnionKind
         List<Name> memberTypes;
+
+        Type() : flags(0) {}
     };
 
     String name;
@@ -79,8 +89,6 @@ struct Xsd
 
     HashSet<String> targetNamespaces;
     HashMap<String, String> namespaceToSuggestedPrefix;
-
-    //String xmlSchemaNamespacePrefix;
 };
 
 inline usize hash(const Xsd::Name& name)
@@ -94,6 +102,16 @@ inline usize hash(const Xsd::Name& name)
 inline bool operator==(const Xsd::Name& lh, const Xsd::Name& rh)
 {
     return lh.name == rh.name && lh.namespace_ == rh.namespace_;
+}
+
+inline bool operator>(const Xsd::Name& lh, const Xsd::Name& rh)
+{
+    return lh.name > rh.name || (lh.name == rh.name && lh.namespace_ > rh.namespace_);
+}
+
+inline bool operator<(const Xsd::Name& lh, const Xsd::Name& rh)
+{
+    return lh.name < rh.name || (lh.name == rh.name && lh.namespace_ < rh.namespace_);
 }
 
 bool readXsd(const String& name, const String& file, Xsd& xsd, String& error);

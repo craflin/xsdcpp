@@ -65,8 +65,7 @@ public:
         _output.name = name;
         _output.rootType = rootTypeName;
 
-        if (!resolveElementRefs())
-            return false;
+        resolveElementRefs();
 
         return true;
     }
@@ -103,22 +102,22 @@ private:
             return element != nullptr;
         }
     };
-
+/*
     struct Group
     {
         List<Xsd::GroupMember> members;
     };
-
+*/
 private:
     Xsd& _output;
     String _path;
     HashMap<Namespace, NamespaceData> _namespaces;
     String _error;
-    HashMap<Xsd::Name, Group> _groups;
+    //HashMap<Xsd::Name, Group> _groups;
 
 private:
 
-    bool resolveElementRefs()
+    void resolveElementRefs()
     {
         for (HashMap<Xsd::Name, Xsd::Type>::Iterator i = _output.types.begin(), end = _output.types.end(); i != end; ++i)
         {
@@ -128,32 +127,18 @@ private:
             {
                 Xsd::ElementRef& elementRef = *i;
 
-                if (!elementRef.typeName.name.startsWith("ref "))
+                if (elementRef.refName.name.isEmpty())
                     continue;
 
-                String refName = elementRef.typeName.name.substr(4);
-                const char* n = refName.find(' ');
-                String typeName = refName.substr(n + 1 - (const char*)refName);
-                refName = refName.substr(0, n - (const char*)refName);
-                n = elementRef.typeName.namespace_.find(' ');
-                String refNamespace = elementRef.typeName.namespace_.substr(0, n - (const char*)elementRef.typeName.namespace_);
-                String typeNamespace = elementRef.typeName.namespace_.substr(n + 1- (const char*)elementRef.typeName.namespace_);
+                Xsd::Name substitutionGroupTypeName = elementRef.refName;
+                substitutionGroupTypeName.name.append("_group_t");
 
-                elementRef.name.name = refName;
-                elementRef.name.namespace_ = refNamespace;
-
-                elementRef.typeName.name = typeName;
-                elementRef.typeName.namespace_ = typeNamespace;
-
-                HashMap<Xsd::Name, Group>::Iterator it = _groups.find(elementRef.name);
-                if (it == _groups.end())
-                    continue;
-
-                Group& group = *it;
-                elementRef.groupMembers = group.members;
+                if (_output.types.contains(substitutionGroupTypeName))
+                    elementRef.typeName = substitutionGroupTypeName;
+                else
+                    elementRef.refName = Xsd::Name();
             }
         }
-        return true;
     }
 
     bool loadXsdFile(const String& file)
@@ -416,32 +401,8 @@ private:
         return true;
     }
 
-    bool processXsElement(const Position& position, const Xsd::Name& parentTypeName, Xsd::Name& typeName, bool atRoot = false)
+    bool processXsElement(const Position& position, const Xsd::Name& parentTypeName, Xsd::ElementRef& elementRef, bool atRoot = false)
     {
-        String substitutionGroupWithNamespacePrefix = getXmlAttribute(*position.element, "substitutionGroup");
-        if (!substitutionGroupWithNamespacePrefix.isEmpty())
-        {
-            Xsd::Name substitutionGroup;
-            if (!resolveNamespacePrefix(position, substitutionGroupWithNamespacePrefix, substitutionGroup))
-                return false;
-
-            HashMap<Xsd::Name, Group>::Iterator it = _groups.find(substitutionGroup);
-            Group* group;
-            if (it == _groups.end())
-                group = &_groups.append(substitutionGroup, Group());
-            else
-                group = &*it;
-
-            Xsd::GroupMember& member = group->members.append(Xsd::GroupMember());
-            member.name.name = getXmlAttribute(*position.element, "name");
-            member.name.namespace_ = position.xsdFileData->targetNamespace;
-            if (!resolveNamespacePrefix(position, getXmlAttribute(*position.element, "type"), member.typeName))
-                return false;
-
-             if (!processType(position, member.typeName))
-                return false;
-        }
-
         // reference to another element
         String refWithNamespacePrefix = getXmlAttribute(*position.element, "ref");
         if (!refWithNamespacePrefix.isEmpty())
@@ -449,17 +410,20 @@ private:
             if (atRoot)
                 return true;
 
-            Xsd::Name ref;
-            if (!resolveNamespacePrefix(position, refWithNamespacePrefix, ref))
+            Xsd::Name refName;
+            if (!resolveNamespacePrefix(position, refWithNamespacePrefix, refName))
                 return false;
 
-            Position refPos = findGlobalRefByName(position, "element", ref);
+            Position refPos = findGlobalRefByName(position, "element", refName);
             if (!refPos)
-                return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)ref.name)), false;
-            if (!processXsElement(refPos, Xsd::Name(), typeName))
+                return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)refName.name)), false;
+
+            if (!processXsElement(refPos, Xsd::Name(), elementRef, atRoot))
                 return false;
-            typeName.name = String("ref ") + ref.name + " " + typeName.name;
-            typeName.namespace_ = ref.namespace_ + " " + typeName.namespace_;
+
+            elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
+            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+            elementRef.refName = refName;
             return true;
         }
 
@@ -467,23 +431,47 @@ private:
         String typeNameWithNamespacePrefix = getXmlAttribute(*position.element, "type");
         if (!typeNameWithNamespacePrefix.isEmpty())
         {
-            if (!resolveNamespacePrefix(position, typeNameWithNamespacePrefix, typeName))
+            if (!resolveNamespacePrefix(position, typeNameWithNamespacePrefix, elementRef.typeName))
                 return false;
 
-            if (!processType(position, typeName))
+            if (!processType(position, elementRef.typeName))
                 return false;
 
-            if (isXsStringBaseType(typeName))
+            if (isXsStringBaseType(elementRef.typeName))
             {
                 String name = getXmlAttribute(*position.element, "name");
 
-                typeName.name = parentTypeName.name + "_" + name + "_t";
-                typeName.namespace_ = position.xsdFileData->targetNamespace;
+                elementRef.typeName.name = parentTypeName.name + "_" + name + "_t";
+                elementRef.typeName.namespace_ = position.xsdFileData->targetNamespace;
 
-                Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
+                Xsd::Type& type = _output.types.append(elementRef.typeName, Xsd::Type());
                 type.kind = Xsd::Type::ElementKind;
                 type.baseType.name = "string";
                 type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+            }
+
+            elementRef.name.name = getXmlAttribute(*position.element, "name");
+            elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
+            elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
+            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+
+            // add the type to its substitution group
+            String substitutionGroupWithNamespacePrefix = getXmlAttribute(*position.element, "substitutionGroup");
+            if (!substitutionGroupWithNamespacePrefix.isEmpty())
+            {
+                Xsd::Name substitutionGroup;
+                if (!resolveNamespacePrefix(position, substitutionGroupWithNamespacePrefix, substitutionGroup))
+                    return false;
+
+                Xsd::Name substitutionGroupTypeName = substitutionGroup;
+                substitutionGroupTypeName.name.append("_group_t");
+
+                Xsd::Type& type  = _output.types.append(substitutionGroupTypeName, Xsd::Type(), false);
+                type.kind = Xsd::Type::Kind::SubstitutionGroupKind;
+                Xsd::ElementRef& elementRefInGroup = type.elements.append(Xsd::ElementRef());
+                elementRefInGroup.name = elementRef.name;
+                elementRefInGroup.typeName = elementRef.typeName;
+                elementRefInGroup.minOccurs = 0;
             }
 
             return true;
@@ -496,8 +484,9 @@ private:
         String name = getXmlAttribute(*position.element, "name");
         if (!name.isEmpty())
         {
-            typeName.name = parentTypeName.name + "_" + name + "_t";
-            typeName.namespace_ = position.xsdFileData->targetNamespace;
+            elementRef.typeName.name = parentTypeName.name + "_" + name + "_t";
+            elementRef.typeName.namespace_ = position.xsdFileData->targetNamespace;
+
             for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
             {
                 const Xml::Variant& variant = *i;
@@ -510,8 +499,13 @@ private:
                 childPosition.xsdFileData = position.xsdFileData;
                 if (compareXsName(position, element.type, "element") || compareXsName(position, element.type, "complexType") || compareXsName(position, element.type, "simpleType"))
                 {
-                    if (!processTypeElement(childPosition, typeName))
+                    if (!processTypeElement(childPosition, elementRef.typeName))
                         return false;
+
+                    elementRef.name.name = getXmlAttribute(*position.element, "name");
+                    elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
+                    elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
+                    elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
                     return true;
                 }
             }
@@ -648,6 +642,9 @@ private:
 
         else if (compareXsName(position, element.type, "complexType"))
         {
+            Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
+            type.kind = Xsd::Type::ElementKind;
+
             List<Xsd::AttributeRef> attributes;
             List<Xsd::ElementRef> elements;
             Xsd::Name baseTypeName;
@@ -689,16 +686,16 @@ private:
 
                     if (!choiceElements.isEmpty())
                     {
-                        Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                        elementRef.minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
-                        elementRef.maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
+                        uint minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
+                        uint maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
 
                         for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                         {
                             const Xsd::ElementRef& choiceElement = *i;
-                            Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
-                            groupMember.name = choiceElement.name;
-                            groupMember.typeName = choiceElement.typeName;
+                            Xsd::ElementRef& elementRef = elements.append(choiceElement);
+                            //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was not actually set in choiceElement?
+                            elementRef.minOccurs = 0;
+                            elementRef.maxOccurs = maxOccurs;
                         }
                     }
                 }
@@ -750,16 +747,16 @@ private:
 
                                         if (!choiceElements.isEmpty())
                                         {
-                                            Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                                            elementRef.minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
-                                            elementRef.maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
+                                            uint minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
+                                            uint maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
 
                                             for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                                             {
                                                 const Xsd::ElementRef& choiceElement = *i;
-                                                Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
-                                                groupMember.name = choiceElement.name;
-                                                groupMember.typeName = choiceElement.typeName;
+                                                Xsd::ElementRef& elementRef = elements.append(choiceElement);
+                                                //elementRef.minOccurs = minOccurs;  // todo: skip this if min/max was set actually set in choiceElement?
+                                                elementRef.minOccurs  = 0;
+                                                elementRef.maxOccurs = maxOccurs;
                                             }
                                         }
                                     }
@@ -782,8 +779,6 @@ private:
                     Console::printf("skipped %s\n", (const char*)element.type);
             }
 
-            Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
-            type.kind = Xsd::Type::ElementKind;
             type.baseType = baseTypeName;
             type.attributes.swap(attributes);
             type.elements.swap(elements);
@@ -805,11 +800,12 @@ private:
                     if (!resolveNamespacePrefix(position, typeStr, baseType))
                         return false;
 
+                    Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
+                    type.kind = Xsd::Type::ElementKind;
+
                     if (!processType(position, baseType))
                         return false;
                 
-                    Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
-                    type.kind = Xsd::Type::ElementKind;
                     type.baseType = baseType;
                 
                     return true;
@@ -911,23 +907,17 @@ private:
             const Xml::Element& element = variant.toElement();
             if (compareXsName(position, element.type, "element"))
             {
-                Xsd::Name typeName;
                 Position elementPosition;
                 elementPosition.element = &element;
                 elementPosition.xsdFileData = position.xsdFileData;
-                if (!processXsElement(elementPosition, parentTypeName, typeName))
+                Xsd::ElementRef elementRef;
+                if (!processXsElement(elementPosition, parentTypeName, elementRef))
                     return false;
 
-                if (typeName.name.isEmpty())
+                if (elementRef.name.name.isEmpty() || elementRef.typeName.name.isEmpty())
                     continue;
 
-                Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                elementRef.name.name = getXmlAttribute(element, "name");
-                elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
-                elementRef.typeName = typeName;
-                // todo: get minOccurs and maxOccurs from referenced element in isRef case?
-                elementRef.minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
-                elementRef.maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
+                elements.append(elementRef);
             }
             else if (compareXsName(position, element.type, "choice"))
             {
@@ -942,16 +932,16 @@ private:
 
                 if (!choiceElements.isEmpty())
                 {
-                    Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                    elementRef.minOccurs = getXmlAttribute(element, "minOccurs", getXmlAttribute(*position.element, "minOccurs", "1")).toUInt();
-                    elementRef.maxOccurs = getXmlAttribute(element, "maxOccurs", getXmlAttribute(*position.element, "maxOccurs", "1")).toUInt();
-
+                    uint minOccurs = getXmlAttribute(element, "minOccurs", getXmlAttribute(*position.element, "minOccurs", "1")).toUInt();
+                    uint maxOccurs = getXmlAttribute(element, "maxOccurs", getXmlAttribute(*position.element, "maxOccurs", "1")).toUInt();
+                    
                     for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                     {
                         const Xsd::ElementRef& choiceElement = *i;
-                        Xsd::GroupMember& groupMember = elementRef.groupMembers.append(Xsd::GroupMember());
-                        groupMember.name = choiceElement.name;
-                        groupMember.typeName = choiceElement.typeName;
+                        Xsd::ElementRef& elementRef = elements.append(choiceElement);
+                        //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was set actually set in choiceElement?
+                        elementRef.minOccurs = 0;
+                        elementRef.maxOccurs = maxOccurs;
                     }
                 }
             }
@@ -1000,21 +990,20 @@ private:
                         elementPosition.element = &element;
                         elementPosition.xsdFileData = position.xsdFileData;
 
-                        Xsd::Name typeName;
-                        if (!processXsElement(elementPosition, Xsd::Name(), typeName, true))
+                        Xsd::ElementRef elementRef;
+                        if (!processXsElement(elementPosition, Xsd::Name(), elementRef, true))
                             return false;
 
-                        if (typeName.name.isEmpty())
+                        if (elementRef.name.name.isEmpty() || elementRef.typeName.name.isEmpty())
                             continue;
 
-                        if (&namespaceData == &*_namespaces.begin())
+                        if (&namespaceData == &*_namespaces.begin() && 
+                            !getXmlAttribute(element, "abstract", "false").toBool() &&
+                            getXmlAttribute(element, "substitutionGroup").isEmpty())
                         {
-                            Xsd::ElementRef& elementRef = elements.append(Xsd::ElementRef());
-                            elementRef.name.name = getXmlAttribute(element, "name");
-                            elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
-                            elementRef.typeName = typeName;
-                            elementRef.minOccurs = 1;
-                            elementRef.maxOccurs = 1;
+                            // todo: filter out elements that have been referenced from other elements?
+
+                            elements.append(elementRef);
                         }
                     }
                 }
