@@ -627,8 +627,19 @@ private:
                 String itemTypeStr = getXmlAttribute(*list.element, "itemType");
                 if (itemTypeStr.isEmpty())
                 {
-                    type.baseType.name  = "anySimpleType";
-                    type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                    const Position simpleType = findXsElementByXmlType(list, "simpleType");
+                    if (simpleType)
+                    {
+                        type.baseType = typeName;
+                        type.baseType.name += "_item_t";
+                        if (!processTypeElement(simpleType, type.baseType))
+                            return false;
+                    }
+                    else
+                    {
+                        type.baseType.name  = "anySimpleType";
+                        type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                    }
                 }
                 else if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
                     return false;

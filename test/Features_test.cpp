@@ -100,7 +100,17 @@ TEST(Features, SimpleTypeExtension)
     {
         SimpleTypeExtension::MainStr main;
         SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
-    <MainStr>hello</MainStr>)", main);
-        EXPECT_EQ(main, "hello");
+    <MainStr>hello  space</MainStr>)", main);
+        EXPECT_EQ(main, "hello  space");
+    }
+
+    {
+        SimpleTypeExtension::MainEnumList main;
+        SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <MainEnumList>C   B A</MainEnumList>)", main);
+        EXPECT_EQ(main.size(), 3);
+        EXPECT_EQ(main[0], SimpleTypeExtension::MyList_item_t::C);
+        EXPECT_EQ(main[1], SimpleTypeExtension::MyList_item_t::B);
+        EXPECT_EQ(main[2], SimpleTypeExtension::MyList_item_t::A);
     }
 }

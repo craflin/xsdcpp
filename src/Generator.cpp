@@ -278,7 +278,8 @@ private:
     enum ReadTextMode
     {
         SkipMode,
-        ReadAndProcessMode,
+        ReadAndProcessTextMode,
+        ReadAndProcessTextItemsMode,
         SkipProcessingMode,
     };
 
@@ -301,7 +302,7 @@ private:
         if (it2 == _xsd.types.end())
             return typeName;
         const Xsd::Type& type = *it2;
-        if ((type.kind == Xsd::Type::Kind::ElementKind || Xsd::Type::Kind::SimpleRefKind) && !type.baseType.name.isEmpty())
+        if ((type.kind == Xsd::Type::Kind::ElementKind || type.kind == Xsd::Type::Kind::SimpleRefKind) && !type.baseType.name.isEmpty())
             return getRootTypeName(type.baseType);
         return typeName;
     }
@@ -321,10 +322,12 @@ private:
         {
             if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
                 return SkipProcessingMode;
-            return ReadAndProcessMode;
+            return ReadAndProcessTextMode;
         }
         if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind)
-            return ReadAndProcessMode;
+            return ReadAndProcessTextMode;
+        if (rootType.kind == Xsd::Type::Kind::ListKind)
+            return ReadAndProcessTextItemsMode;
         return SkipMode;
     }
 
@@ -795,8 +798,11 @@ private:
             {
             case SkipMode:
                 break;
-            case ReadAndProcessMode:
+            case ReadAndProcessTextMode:
                 flags.append("|ElementInfo::ReadTextFlag");
+                break;
+            case ReadAndProcessTextItemsMode:
+                flags.append("|ElementInfo::ReadTextFlag|ElementInfo::ProcessTextItemsFlag");
                 break;
             case SkipProcessingMode:
                 flags.append("|ElementInfo::ReadTextFlag|ElementInfo::SkipProcessingFlag");
@@ -805,7 +811,7 @@ private:
             if (flags.startsWith("0|"))
                 flags = flags.substr(2);
 
-            if (baseType && (baseType->kind == Xsd::Type::Kind::StringKind || baseType->kind == Xsd::Type::Kind::EnumKind || baseType->kind == Xsd::Type::Kind::BaseKind))
+            if (baseType && (baseType->kind == Xsd::Type::Kind::StringKind || baseType->kind == Xsd::Type::Kind::EnumKind || baseType->kind == Xsd::Type::Kind::BaseKind || baseType->kind == Xsd::Type::Kind::ListKind))
                 baseCppName.clear();
 
             if (readTextMode != SkipMode)
@@ -814,6 +820,18 @@ private:
                 Xsd::Type rootType = getType(rootTypeName);
                 if (rootType.kind == Xsd::Type::Kind::StringKind)
                     _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::string& str = *element; if (str.empty()) str = std::move(text); else str += text; }");
+                else if (rootType.kind == Xsd::Type::Kind::ListKind)
+                {
+                    Xsd::Type itemType = getType(rootType.baseType);
+                    if (itemType.kind == Xsd::Type::Kind::StringKind)
+                        _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(std::move(text)); }");
+                    else
+                    {
+                        String itemTypeCppName = *_generatedTypes.find(rootType.baseType);
+                        String itemTypeCppNameWithNamespace = toCppTypeWithNamespace(itemTypeCppName);
+                        _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(toType<" + itemTypeCppNameWithNamespace + ">(pos, text)); }");
+                    }
+                }
                 else
                 {
                     String rootTypeCppName = *_generatedTypes.find(rootTypeName);

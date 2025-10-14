@@ -4,9 +4,8 @@
     <xsd:element name="MainEnum" type="local:MainEnum" />
     <xsd:element name="MainInt" type="local:MainInt" />
     <xsd:element name="MainStr" type="local:MainStr" />
-    <!--
-    <xsd:element name="Main4" type="local:Main4" />
--->
+    <xsd:element name="MainEnumList" type="local:MainEnumList" />
+
     <xsd:simpleType name="XEnumZZ">
         <xsd:restriction base="xsd:string">
             <xsd:enumeration value="A"/>
@@ -38,7 +37,7 @@
             </xsd:extension>
         </xsd:simpleContent>
     </xsd:complexType>
-    <!--
+
     <xsd:simpleType name="MyList">
         <xsd:list>
             <xsd:simpleType>
@@ -51,14 +50,14 @@
         </xsd:list>
     </xsd:simpleType>
 
-    <xsd:complexType name="Main4">
+    <xsd:complexType name="MainEnumList">
         <xsd:simpleContent>
             <xsd:extension base="local:MyList">
                 <xsd:attribute name="entity" type="xsd:string" />
             </xsd:extension>
         </xsd:simpleContent>
     </xsd:complexType>
--->
+
 </xsd:schema>
 
 

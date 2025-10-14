@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     if (!readXsd(name, inputFile, xsd, error) ||
         !generateCpp(xsd, outputDir, error))
     {
-        Console::errorf("%s\n", (const char*)error);
+        Console::errorf("error: %s\n", (const char*)error);
         return 1;
     }
 

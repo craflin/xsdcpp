@@ -44,6 +44,7 @@ struct ElementInfo
         ReadTextFlag = 0x02,
         SkipProcessingFlag = 0x04,
         AnyAttributeFlag = 0x08,
+        ProcessTextItemsFlag = 0x10
     };
     
     size_t flags;
@@ -588,7 +589,32 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
-                elementContext.info->addText(elementContext.element, context.pos, std::move(text));
+                if (elementContext.info->flags & ElementInfo::ProcessTextItemsFlag)
+                {
+                    const char* s = text.c_str();
+                    for (;;)
+                    {
+                        while (isspace(*s))
+                            ++s;
+                        if (!*s)
+                            break;
+                        const char* end = strpbrk(s, " \t\n\r");
+                        if (end)
+                        {
+                            std::string item(s, end - s);
+                            elementContext.info->addText(elementContext.element, context.pos, std::move(item));
+                        }
+                        else
+                        {
+                            std::string item(s);
+                            elementContext.info->addText(elementContext.element, context.pos, std::move(item));
+                            break;
+                        }
+                        s = end;
+                    }
+                }
+                else
+                    elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
         else
