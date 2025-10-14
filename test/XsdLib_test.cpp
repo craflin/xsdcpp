@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-TEST(XsdLib, basic_optional)
+TEST(XsdLib, optional_base)
 {
     xsd::optional<int32_t> i32;
     EXPECT_FALSE(i32);
