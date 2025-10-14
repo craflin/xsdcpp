@@ -234,6 +234,32 @@ private:
     T* _data2;
 };
 
+template <typename T>
+class base
+{
+public:
+    base()
+        : _value()
+    {
+    }
+    base(T value) 
+        : _value(value)
+    {
+    }
+
+    operator T() const { return _value; }
+
+    base& operator=(T value)
+    {
+        _value = value;
+        return *this;
+    }
+
+private:
+    T _value;
+};
+
+
 /*
 template <> class optional<int8_t> : public basic_optional<int8_t> {};
 template <> class optional<uint8_t> : public basic_optional<uint8_t> {};

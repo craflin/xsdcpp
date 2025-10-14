@@ -17,6 +17,7 @@ typedef void* (*get_element_field_t)(void*);
 typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
 typedef void (*set_attribute_default_t)(void*);
 typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
+typedef void (*add_text_t)(void*, const Position&, std::string&& name);
 
 struct ChildElementInfo
 {
@@ -53,6 +54,7 @@ struct ElementInfo
     size_t attributesCount;
     const ElementInfo* base;
     set_any_attribute_t setOtherAttribute;
+    add_text_t addText;
 };
 
 struct ElementContext
@@ -520,15 +522,6 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
-void addText(Context& context, ElementContext& elementContext, std::string&& text)
-{
-    std::string& element = *(std::string*)elementContext.element;
-    if (element.empty())
-        element = std::move(text);
-    else
-        element += text;
-}
-
 void checkAttributes(Context& context, ElementContext& elementContext)
 {
     uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
@@ -595,7 +588,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
-                addText(context, elementContext, std::move(text));
+                elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
         else

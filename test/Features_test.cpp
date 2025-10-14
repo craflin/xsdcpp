@@ -3,6 +3,7 @@
 #include "SubstitutionGroup.hpp"
 #include "Choice.hpp"
 #include "Recursion.hpp"
+#include "SimpleTypeExtension.hpp"
 
 #include <gtest/gtest.h>
 
@@ -77,5 +78,29 @@ TEST(Features, Recursion)
 
         EXPECT_TRUE(main2.SubMain);
         EXPECT_TRUE(main2.SubMain->SubMain);
+    }
+}
+
+TEST(Features, SimpleTypeExtension)
+{
+    {
+        SimpleTypeExtension::MainEnum main;
+        SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <MainEnum>B</MainEnum>)", main);
+        EXPECT_EQ(main, SimpleTypeExtension::XEnumZZ::B);
+    }
+
+    {
+        SimpleTypeExtension::MainInt main;
+        SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <MainInt>42</MainInt>)", main);
+        EXPECT_EQ(main, 42);
+    }
+
+    {
+        SimpleTypeExtension::MainStr main;
+        SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <MainStr>hello</MainStr>)", main);
+        EXPECT_EQ(main, "hello");
     }
 }

@@ -123,6 +123,11 @@ add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Recursion.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Recursion.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Recursion.xsd"
 )
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTypeExtension.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.hpp" "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.cpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTypeExtension.xsd"
+)
 add_executable(Features_test
     Features_test.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/SubstitutionGroup.hpp"
@@ -131,6 +136,8 @@ add_executable(Features_test
     "${CMAKE_CURRENT_BINARY_DIR}/Choice.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Recursion.hpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Recursion.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.cpp"
 )
 target_require_cpp11(Features_test)
 target_link_libraries(Features_test PRIVATE mingtest::gtest mingtest::gtest_main)

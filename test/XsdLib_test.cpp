@@ -23,5 +23,10 @@ TEST(XsdLib, optional)
     xsd::optional<A> a;
     EXPECT_FALSE(a);
     a = A{1,23};
+}
 
+TEST(XsdLib, base)
+{
+    xsd::base<int32_t> a(23);
+    EXPECT_EQ(a, 23);
 }

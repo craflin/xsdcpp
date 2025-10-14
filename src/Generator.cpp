@@ -295,31 +295,37 @@ private:
         return isSkipProcessContentsFlagSet(type.baseType);
     }
 
-    bool isBaseTypeString(const Xsd::Name& typeName) const
+    Xsd::Name getRootTypeName(const Xsd::Name& typeName) const
     {
-        if (typeName.name.isEmpty())
-            return false;
-        HashMap<Xsd::Name, String>::Iterator it = _generatedTypes.find(typeName);
-        if (it != _generatedTypes.end())
-        {
-            const String& cppTypeName = *it;
-            if (cppTypeName == "xsd::string")
-                return true;
-        }
         HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
         if (it2 == _xsd.types.end())
-            return false;
+            return typeName;
         const Xsd::Type& type = *it2;
-        return isBaseTypeString(type.baseType);
+        if ((type.kind == Xsd::Type::Kind::ElementKind || Xsd::Type::Kind::SimpleRefKind) && !type.baseType.name.isEmpty())
+            return getRootTypeName(type.baseType);
+        return typeName;
+    }
+
+    Xsd::Type getType(const Xsd::Name& typeName) const
+    {
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        if (it2 == _xsd.types.end())
+            return Xsd::Type();
+        return *it2;
     }
 
     ReadTextMode getReadTextMode(const Xsd::Name& typeName) const
     {
-        if (typeName.name.isEmpty() || !isBaseTypeString(typeName))
-            return SkipMode;
-        if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
-            return SkipProcessingMode;
-        return ReadAndProcessMode;
+        Xsd::Type rootType = getType(getRootTypeName(typeName));
+        if (rootType.kind == Xsd::Type::Kind::StringKind)
+        {
+            if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
+                return SkipProcessingMode;
+            return ReadAndProcessMode;
+        }
+        if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind)
+            return ReadAndProcessMode;
+        return SkipMode;
     }
 
     static String toCStringLiteral(const String& str)
@@ -615,9 +621,13 @@ private:
             _generatedTypes.append(typeName, cppName);
 
             String baseCppName;
+            Xsd::Type* baseType = nullptr;
             if (!type.baseType.name.isEmpty())
+            {
                 if (!processType2(type.baseType, baseCppName, level + 1, true))
                     return false;
+                baseType = &*_xsd.types.find(type.baseType);
+            }
 
             List<String> structFields;
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
@@ -646,10 +656,16 @@ private:
             }
 
             List<String> structDefintiion;
-            if (baseCppName.isEmpty())
-                structDefintiion.append(String("struct ") + cppName);
+            if (baseType)
+            {
+                if (baseType->kind == Xsd::Type::BaseKind || baseType->kind == Xsd::Type::EnumKind)
+                    structDefintiion.append(String("struct ") + cppName + " : xsd::base<" + baseCppName + ">");
+                else
+                    structDefintiion.append(String("struct ") + cppName + " : " + baseCppName);
+            }
             else
-                structDefintiion.append(String("struct ") + cppName + " : " + baseCppName);
+                structDefintiion.append(String("struct ") + cppName);
+
             structDefintiion.append("{");
             for (List<String>::Iterator i = structFields.begin(), end = structFields.end(); i != end; ++i)
                 structDefintiion.append(String("    ") + *i + ";");
@@ -774,7 +790,8 @@ private:
                 flags.append("|ElementInfo::Level1Flag");
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 flags.append("|ElementInfo::AnyAttributeFlag");
-            switch (getReadTextMode(typeName))
+            ReadTextMode readTextMode = getReadTextMode(typeName);
+            switch (readTextMode)
             {
             case SkipMode:
                 break;
@@ -785,13 +802,30 @@ private:
                 flags.append("|ElementInfo::ReadTextFlag|ElementInfo::SkipProcessingFlag");
                 break;
             }
+            if (flags.startsWith("0|"))
+                flags = flags.substr(2);
 
-            if (baseCppName == "xsd::string")
+            if (baseType && (baseType->kind == Xsd::Type::Kind::StringKind || baseType->kind == Xsd::Type::Kind::EnumKind || baseType->kind == Xsd::Type::Kind::BaseKind))
                 baseCppName.clear();
+
+            if (readTextMode != SkipMode)
+            {
+                Xsd::Name rootTypeName = getRootTypeName(typeName);
+                Xsd::Type rootType = getType(rootTypeName);
+                if (rootType.kind == Xsd::Type::Kind::StringKind)
+                    _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::string& str = *element; if (str.empty()) str = std::move(text); else str += text; }");
+                else
+                {
+                    String rootTypeCppName = *_generatedTypes.find(rootTypeName);
+                    String rootTypeCppNameWithNamespace = toCppTypeWithNamespace(rootTypeCppName);
+                    _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::base<" + rootTypeCppNameWithNamespace+ ">& base = *element; base = toType<" + rootTypeCppNameWithNamespace + ">(pos, text); }");
+                }
+            }
 
             _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flags + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
                 + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(set_any_attribute_t)&any_") + cppName : String("nullptr"))
+                + ", " + (readTextMode != SkipMode ? String("(add_text_t)&add_text_") + cppName : String("nullptr"))
                 + " };");
             _cppOutput.append("");
 

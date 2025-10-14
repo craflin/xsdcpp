@@ -45,6 +45,7 @@ struct Xsd
     {
         enum Kind
         {
+            UnknownKind,
             BaseKind,
             SimpleRefKind,
             StringKind,
@@ -80,7 +81,7 @@ struct Xsd
         // when UnionKind
         List<Name> memberTypes;
 
-        Type() : flags(0) {}
+        Type() : kind(UnknownKind), flags(0) {}
     };
 
     String name;
