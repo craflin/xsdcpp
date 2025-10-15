@@ -5,9 +5,7 @@
     <xsd:element name="MainInt" type="local:MainInt" />
     <xsd:element name="MainStr" type="local:MainStr" />
     <xsd:element name="MainEnumList" type="local:MainEnumList" />
-    <!--
     <xsd:element name="MainWithListElement" type="local:MainWithListElement" />
-    -->
 
     <xsd:element name="Version" type="local:Version" />
     

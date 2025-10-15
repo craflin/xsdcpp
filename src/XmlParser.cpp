@@ -13,11 +13,11 @@ struct ElementContext;
 struct Position;
 struct ElementInfo;
 
+typedef void (*add_text_t)(void*, const Position&, std::string&& name);
 typedef void* (*get_element_field_t)(void*);
 typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
 typedef void (*set_attribute_default_t)(void*);
 typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
-typedef void (*add_text_t)(void*, const Position&, std::string&& name);
 
 struct ChildElementInfo
 {
@@ -40,7 +40,7 @@ struct ElementInfo
 {
     enum ElementFlag
     {
-        Level1Flag = 0x01,
+        EntryPointFlag = 0x01,
         ReadTextFlag = 0x02,
         SkipProcessingFlag = 0x04,
         AnyAttributeFlag = 0x08,
@@ -48,6 +48,7 @@ struct ElementInfo
     };
     
     size_t flags;
+    add_text_t addText;
     const ChildElementInfo* children;
     size_t childrenCount;
     size_t mandatoryChildrenCount;
@@ -55,7 +56,6 @@ struct ElementInfo
     size_t attributesCount;
     const ElementInfo* base;
     set_any_attribute_t setOtherAttribute;
-    add_text_t addText;
 };
 
 struct ElementContext
@@ -489,7 +489,7 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
                     a->setAttribute(elementContext.element, context.pos, std::move(value));
                     return;
                 }
-    if (elementContext.info->flags & ElementInfo::Level1Flag)
+    if (elementContext.info->flags & ElementInfo::EntryPointFlag)
     {
         if (name.compare(0, 5, "xmlns") == 0 && (name.size() == 5 || name.c_str()[5] == ':'))
         {

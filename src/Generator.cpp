@@ -204,6 +204,7 @@ private:
     List<String>& _hppOutput;
     String _cppNamespace;
     HashMap<Xsd::Name, String> _generatedTypes;
+    HashMap<Xsd::Name, String> _generatedElementInfos;
     HashMap<Xsd::Name, String> _requiredTypes;
     String _error;
 
@@ -435,6 +436,80 @@ private:
 
         cppName = toCppTypeIdentifier(typeName);
         _requiredTypes.append(typeName, cppName); // create full type definition later
+        return true;
+    }
+
+    String generateAddTextFunction(const Xsd::Name& typeName, const String& cppName, List<String>& flags)
+    {
+        ReadTextMode readTextMode = getReadTextMode(typeName);
+        if (readTextMode == SkipMode)
+            return "nullptr";
+        flags.append("ElementInfo::ReadTextFlag");
+        switch (readTextMode)
+        {
+        case ReadAndProcessTextItemsMode:
+            flags.append("ElementInfo::ProcessTextItemsFlag");
+            break;
+        case SkipProcessingMode:
+            flags.append("ElementInfo::SkipProcessingFlag");
+            break;
+        }
+
+        String addTextFunctionName = String("add_text_") + cppName;
+
+        Xsd::Name rootTypeName = getRootTypeName(typeName);
+        Xsd::Type rootType = getType(rootTypeName);
+        if (rootType.kind == Xsd::Type::Kind::StringKind)
+            _cppOutput.append(String("void ") + addTextFunctionName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::string& str = *element; if (str.empty()) str = std::move(text); else str += text; }");
+        else if (rootType.kind == Xsd::Type::Kind::ListKind)
+        {
+            Xsd::Type itemType = getType(rootType.baseType);
+            if (itemType.kind == Xsd::Type::Kind::StringKind)
+                _cppOutput.append(String("void ") + addTextFunctionName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(std::move(text)); }");
+            else
+            {
+                String itemTypeCppName = *_generatedTypes.find(rootType.baseType);
+                String itemTypeCppNameWithNamespace = toCppTypeWithNamespace(itemTypeCppName);
+                _cppOutput.append(String("void ") + addTextFunctionName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(toType<" + itemTypeCppNameWithNamespace + ">(pos, text)); }");
+            }
+        }
+        else
+        {
+            String rootTypeCppName = *_generatedTypes.find(rootTypeName);
+            String rootTypeCppNameWithNamespace = toCppTypeWithNamespace(rootTypeCppName);
+            _cppOutput.append(String("void ") + addTextFunctionName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::base<" + rootTypeCppNameWithNamespace+ ">& base = *element; base = toType<" + rootTypeCppNameWithNamespace + ">(pos, text); }");
+        }
+        return String("(add_text_t)&") + addTextFunctionName;
+    }
+
+
+    bool generateElementInfo(const Xsd::Name& typeName)
+    {
+        HashMap<Xsd::Name, String>::Iterator it = _generatedElementInfos.find(typeName);
+        if (it != _generatedElementInfos.end())
+            return true;
+
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it2 = _xsd.types.find(typeName);
+        if (it2 == _xsd.types.end())
+            return _error = String::fromPrintf("Type '%s' not found", (const char*)typeName.name), false;
+        Xsd::Type& type = *it2;
+
+        if (type.kind == Xsd::Type::ElementKind)
+            return true;
+        
+        String cppName = toCppTypeIdentifier(typeName);
+
+        List<String> flags;
+
+        String addTextFunction = generateAddTextFunction(typeName, cppName, flags);
+
+        String flagsStr("0");
+        if (!flags.isEmpty())
+            flagsStr.join(flags, '|');
+
+        _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flagsStr + ", " + addTextFunction + " };");
+
+        _generatedElementInfos.append(typeName, String());
         return true;
     }
 
@@ -719,7 +794,8 @@ private:
             if (!type.elements.isEmpty())
             {
                 children = String("_") + cppName + "_Children";
-                _cppOutput.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
+                List<String> childElementInfo;
+                childElementInfo.append(String("ChildElementInfo _") + cppName + "_Children[] = {");
                 for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
                 {
                     const Xsd::ElementRef& elementRef = *i;
@@ -736,14 +812,25 @@ private:
                             String subElementCppName;
                             if (!processType2(subElementRef.typeName, subElementCppName, level + 1, false))
                                 return false;
-                            _cppOutput.append(String("    {\"") + subElementRef.name.name + "\", (get_element_field_t)&get_" + cppName +  "_" + toCppTypeIdentifier(elementRef.name) + "_" + toCppTypeIdentifier(subElementRef.name) + ", &_" + subElementCppName + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
+
+                            if (!generateElementInfo(subElementRef.typeName))
+                                return false;
+
+                            childElementInfo.append(String("    {\"") + subElementRef.name.name + "\", (get_element_field_t)&get_" + cppName +  "_" + toCppTypeIdentifier(elementRef.name) + "_" + toCppTypeIdentifier(subElementRef.name) + ", &_" + subElementCppName + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
                         }
                     }
                     else
-                        _cppOutput.append(String("    {\"") + elementRef.name.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                    {
+                        if (!generateElementInfo(elementRef.typeName))
+                            return false;
+
+                        childElementInfo.append(String("    {\"") + elementRef.name.name + "\", (get_element_field_t)&get_" + cppName + "_" + toCppTypeIdentifier(elementRef.name) + ", &_" + elementCppName + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                    }
                 }
-                _cppOutput.append("    {nullptr}\n};");
+                childElementInfo.append("    {nullptr}\n};");
+                _cppOutput.append(childElementInfo);
             }
+
 
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
@@ -788,64 +875,30 @@ private:
             usize childrenCount = getChildrenCount(typeName);
             usize mandatoryChildrenCount = getMandatoryChildrenCount(typeName);
             uint64 attributesCount = getAttributesCount(typeName);
-            String flags = "0";
+            List<String> flags;
             if (level == 1)
-                flags.append("|ElementInfo::Level1Flag");
+                flags.append("ElementInfo::EntryPointFlag");
             if (type.flags & Xsd::Type::AnyAttributeFlag)
-                flags.append("|ElementInfo::AnyAttributeFlag");
-            ReadTextMode readTextMode = getReadTextMode(typeName);
-            switch (readTextMode)
-            {
-            case SkipMode:
-                break;
-            case ReadAndProcessTextMode:
-                flags.append("|ElementInfo::ReadTextFlag");
-                break;
-            case ReadAndProcessTextItemsMode:
-                flags.append("|ElementInfo::ReadTextFlag|ElementInfo::ProcessTextItemsFlag");
-                break;
-            case SkipProcessingMode:
-                flags.append("|ElementInfo::ReadTextFlag|ElementInfo::SkipProcessingFlag");
-                break;
-            }
-            if (flags.startsWith("0|"))
-                flags = flags.substr(2);
+                flags.append("ElementInfo::AnyAttributeFlag");
+
+            String addTextFunction = generateAddTextFunction(typeName, cppName, flags);
 
             if (baseType && (baseType->kind == Xsd::Type::Kind::StringKind || baseType->kind == Xsd::Type::Kind::EnumKind || baseType->kind == Xsd::Type::Kind::BaseKind || baseType->kind == Xsd::Type::Kind::ListKind))
                 baseCppName.clear();
 
-            if (readTextMode != SkipMode)
-            {
-                Xsd::Name rootTypeName = getRootTypeName(typeName);
-                Xsd::Type rootType = getType(rootTypeName);
-                if (rootType.kind == Xsd::Type::Kind::StringKind)
-                    _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::string& str = *element; if (str.empty()) str = std::move(text); else str += text; }");
-                else if (rootType.kind == Xsd::Type::Kind::ListKind)
-                {
-                    Xsd::Type itemType = getType(rootType.baseType);
-                    if (itemType.kind == Xsd::Type::Kind::StringKind)
-                        _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(std::move(text)); }");
-                    else
-                    {
-                        String itemTypeCppName = *_generatedTypes.find(rootType.baseType);
-                        String itemTypeCppNameWithNamespace = toCppTypeWithNamespace(itemTypeCppName);
-                        _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { element->emplace_back(toType<" + itemTypeCppNameWithNamespace + ">(pos, text)); }");
-                    }
-                }
-                else
-                {
-                    String rootTypeCppName = *_generatedTypes.find(rootTypeName);
-                    String rootTypeCppNameWithNamespace = toCppTypeWithNamespace(rootTypeCppName);
-                    _cppOutput.append(String("void add_text_") + cppName + "(" + toCppTypeWithNamespace(cppName) + "* element, const Position& pos, std::string&& text) { xsd::base<" + rootTypeCppNameWithNamespace+ ">& base = *element; base = toType<" + rootTypeCppNameWithNamespace + ">(pos, text); }");
-                }
-            }
+            String flagsStr("0");
+            if (!flags.isEmpty())
+                flagsStr.join(flags, '|');
 
-            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flags + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
+            _cppOutput.append(String("const ElementInfo _") + cppName + "_Info = { " + flagsStr 
+                + ", " + addTextFunction
+                + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
                 + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (baseCppName.isEmpty() ? String("nullptr") : String("&_") + baseCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(set_any_attribute_t)&any_") + cppName : String("nullptr"))
-                + ", " + (readTextMode != SkipMode ? String("(add_text_t)&add_text_") + cppName : String("nullptr"))
                 + " };");
             _cppOutput.append("");
+
+            _generatedElementInfos.append(typeName, String("&_") + cppName + "_Info");
 
             return true;
         }

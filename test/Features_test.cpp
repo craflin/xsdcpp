@@ -113,4 +113,15 @@ TEST(Features, SimpleTypeExtension)
         EXPECT_EQ(main[1], SimpleTypeExtension::MyList_item_t::B);
         EXPECT_EQ(main[2], SimpleTypeExtension::MyList_item_t::A);
     }
+
+    {
+        SimpleTypeExtension::MainWithListElement main;
+        SimpleTypeExtension::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <MainWithListElement><MyList>C   B A</MyList></MainWithListElement>)", main);
+        EXPECT_EQ(main.MyList[0].size(), 3);
+        EXPECT_EQ(main.MyList[0][0], SimpleTypeExtension::MyList_item_t::C);
+        EXPECT_EQ(main.MyList[0][1], SimpleTypeExtension::MyList_item_t::B);
+        EXPECT_EQ(main.MyList[0][2], SimpleTypeExtension::MyList_item_t::A);
+    }
+
 }
