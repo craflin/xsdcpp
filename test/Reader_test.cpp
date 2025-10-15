@@ -6,7 +6,7 @@
 TEST(Reader, readXsd)
 {
     {
-        String inputFile = FOLDER "/ED247A_ECIC.xsd";
+        String inputFile = FOLDER "/ecic/ED247A_ECIC.xsd";
         String error;
         Xsd xsd;
         EXPECT_TRUE(readXsd(String(), inputFile, xsd, error));
