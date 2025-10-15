@@ -6,6 +6,8 @@
     <xsd:element name="MainStr" type="local:MainStr" />
     <xsd:element name="MainEnumList" type="local:MainEnumList" />
 
+    <xsd:element name="Version" type="local:Version" />
+    
     <xsd:simpleType name="XEnumZZ">
         <xsd:restriction base="xsd:string">
             <xsd:enumeration value="A"/>
@@ -58,6 +60,12 @@
         </xsd:simpleContent>
     </xsd:complexType>
 
+    <xsd:simpleType  name="Version">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]+\.[0-9]+\.[0-9]+[\.A-Za-z_0-9\-]*" />
+        </xsd:restriction>
+    </xsd:simpleType>
+    
 </xsd:schema>
 
 

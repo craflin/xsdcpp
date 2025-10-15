@@ -1008,14 +1008,21 @@ private:
                         if (elementRef.name.name.isEmpty() || elementRef.typeName.name.isEmpty())
                             continue;
 
-                        if (&namespaceData == &*_namespaces.begin() && 
-                            !getXmlAttribute(element, "abstract", "false").toBool() &&
-                            getXmlAttribute(element, "substitutionGroup").isEmpty())
-                        {
-                            // todo: filter out elements that have been referenced from other elements?
+                        if (&namespaceData != &*_namespaces.begin() ||
+                            getXmlAttribute(element, "abstract", "false").toBool() ||
+                            !getXmlAttribute(element, "substitutionGroup").isEmpty())
+                            continue;
 
-                            elements.append(elementRef);
-                        }
+                        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _output.types.find(elementRef.typeName);
+                        if (it == _output.types.end())
+                            continue;
+                        const Xsd::Type& type = *it;
+                        if (type.kind != Xsd::Type::Kind::ElementKind)
+                            continue;
+
+                        // todo: filter out elements that have been referenced from other elements?
+
+                        elements.append(elementRef);
                     }
                 }
             }
