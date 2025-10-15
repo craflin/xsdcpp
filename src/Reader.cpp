@@ -239,6 +239,11 @@ private:
                     continue;
 
                 String schemaLocation = getXmlAttribute(element, "schemaLocation");
+                if (schemaLocation.startsWith("platform:"))
+                    schemaLocation = File::getBaseName(schemaLocation); // assume all XSD files can be found in the same folder
+
+                if (schemaLocation == "Ecore.xsd") // I hope we don't need this
+                    continue;
 
                 if (!File::isAbsolutePath(schemaLocation))
                     schemaLocation = File::getDirectoryName(_path) + "/" + schemaLocation;
@@ -467,11 +472,27 @@ private:
                 substitutionGroupTypeName.name.append("_group_t");
 
                 Xsd::Type& type  = _output.types.append(substitutionGroupTypeName, Xsd::Type(), false);
-                type.kind = Xsd::Type::Kind::SubstitutionGroupKind;
-                Xsd::ElementRef& elementRefInGroup = type.elements.append(Xsd::ElementRef());
-                elementRefInGroup.name = elementRef.name;
-                elementRefInGroup.typeName = elementRef.typeName;
-                elementRefInGroup.minOccurs = 0;
+                
+
+                bool addNewGroupMember = true;
+                for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+                {
+                    const Xsd::ElementRef& elementRefInGroup = *i;
+                    if (elementRefInGroup.name == elementRef.name)
+                    {
+                        addNewGroupMember = false;
+                        break;
+                    }
+                }
+
+                if (addNewGroupMember)
+                {
+                    type.kind = Xsd::Type::Kind::SubstitutionGroupKind;
+                    Xsd::ElementRef& elementRefInGroup = type.elements.append(Xsd::ElementRef());
+                    elementRefInGroup.name = elementRef.name;
+                    elementRefInGroup.typeName = elementRef.typeName;
+                    elementRefInGroup.minOccurs = 0;
+                }
             }
 
             return true;
