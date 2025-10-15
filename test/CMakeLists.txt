@@ -17,10 +17,10 @@ function(target_require_cpp11 target)
 
 endfunction()
 
-add_executable(Parser_test Parser_test.cpp)
-target_link_libraries(Parser_test PRIVATE mingtest::gtest mingtest::gtest_main)
-add_test(NAME Parser_test COMMAND Parser_test)
-target_require_cpp11(Parser_test)
+add_executable(XmlParser_test XmlParser_test.cpp)
+target_link_libraries(XmlParser_test PRIVATE mingtest::gtest mingtest::gtest_main)
+add_test(NAME XmlParser_test COMMAND XmlParser_test)
+target_require_cpp11(XmlParser_test)
 
 add_executable(Reader_test Reader_test.cpp)
 target_link_libraries(Reader_test PRIVATE mingtest::gtest mingtest::gtest_main libxsdcpp)
@@ -76,7 +76,7 @@ target_require_cpp11(XsdLib_test)
 add_subdirectory(ecic)
 add_subdirectory(ecoa)
 
-set_target_properties(Parser_test Ecic_test Ecoa_test Generator_test Reader_test Features_test XsdLib_test
+set_target_properties(XmlParser_test Ecic_test Ecoa_test Generator_test Reader_test Features_test XsdLib_test
     PROPERTIES
         FOLDER   "test"
 )

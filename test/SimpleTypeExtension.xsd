@@ -5,6 +5,9 @@
     <xsd:element name="MainInt" type="local:MainInt" />
     <xsd:element name="MainStr" type="local:MainStr" />
     <xsd:element name="MainEnumList" type="local:MainEnumList" />
+    <!--
+    <xsd:element name="MainWithListElement" type="local:MainWithListElement" />
+    -->
 
     <xsd:element name="Version" type="local:Version" />
     
@@ -58,6 +61,12 @@
                 <xsd:attribute name="entity" type="xsd:string" />
             </xsd:extension>
         </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="MainWithListElement">
+        <xsd:sequence>
+            <xsd:element maxOccurs="unbounded" minOccurs="0" name="MyList" type="local:MyList" />
+        </xsd:sequence>
     </xsd:complexType>
 
     <xsd:simpleType  name="Version">
