@@ -38,19 +38,24 @@ add_custom_command(
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SubstitutionGroup.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Choice.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Choice.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Choice.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Choice.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Choice.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Recursion.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Recursion.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Recursion.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Recursion.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Recursion.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTypeExtension.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTypeExtension.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp -t Version
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.hpp" "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/SimpleTypeExtension.xsd"
+)
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Import.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e SimpleTypeExtension
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Import.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Import.cpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Import.xsd"
 )
 add_executable(Features_test
     Features_test.cpp
@@ -62,6 +67,8 @@ add_executable(Features_test
     "${CMAKE_CURRENT_BINARY_DIR}/Recursion.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.hpp"
     "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Import.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Import.cpp"
 )
 target_require_cpp11(Features_test)
 target_link_libraries(Features_test PRIVATE mingtest::gtest mingtest::gtest_main)

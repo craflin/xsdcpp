@@ -41,7 +41,7 @@ public:
 
     const String& getError() const { return _error; }
 
-    bool read(const String& file, const String& name)
+    bool read(const String& file, const List<String>& forceTypeProcessing, const String& name)
     {
         _path = file;
 
@@ -51,6 +51,17 @@ public:
         List<Xsd::ElementRef> elements;
         if (!process(elements))
             return false;
+
+        if (!_namespaces.isEmpty())
+            for (List<String>::Iterator i = forceTypeProcessing.begin(), end = forceTypeProcessing.end(); i != end; ++i)
+            {
+                Xsd::Name typeName;
+                typeName.name = *i;
+                typeName.namespace_ = _namespaces.begin().key();
+                //Console::printf("Processing '%s'...\n", (const char*)typeName.name);
+                if (!processType(typeName))
+                    return false;
+            }
 
         if (elements.isEmpty())
             return (_error = "Root element not found"), false;
@@ -102,18 +113,12 @@ private:
             return element != nullptr;
         }
     };
-/*
-    struct Group
-    {
-        List<Xsd::GroupMember> members;
-    };
-*/
+
 private:
     Xsd& _output;
     String _path;
     HashMap<Namespace, NamespaceData> _namespaces;
     String _error;
-    //HashMap<Xsd::Name, Group> _groups;
 
 private:
 
@@ -304,7 +309,7 @@ private:
         return false;
     }
 
-    Position findGlobalTypeByName(const Position& position, const Xsd::Name& name)
+    Position findGlobalTypeByName(const Xsd::Name& name)
     {
         HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
         if (it2 == _namespaces.end())
@@ -333,7 +338,7 @@ private:
         return Position();
     }
 
-    Position findGlobalRefByName(const Position& position, const String& xsElementNameWithoutPrefix, const Xsd::Name& name)
+    Position findGlobalRefByName(const String& xsElementNameWithoutPrefix, const Xsd::Name& name)
     {
         HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
         if (it2 == _namespaces.end())
@@ -361,7 +366,6 @@ private:
         }
         return Position();
     }
-
 
     Position findXmlElementByNamespaceAndXmlType(const Position& position, const String& namespace_, const String& type)
     {
@@ -419,7 +423,7 @@ private:
             if (!resolveNamespacePrefix(position, refWithNamespacePrefix, refName))
                 return false;
 
-            Position refPos = findGlobalRefByName(position, "element", refName);
+            Position refPos = findGlobalRefByName("element", refName);
             if (!refPos)
                 return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)refName.name)), false;
 
@@ -439,7 +443,7 @@ private:
             if (!resolveNamespacePrefix(position, typeNameWithNamespacePrefix, elementRef.typeName))
                 return false;
 
-            if (!processType(position, elementRef.typeName))
+            if (!processType(elementRef.typeName))
                 return false;
 
             if (isXsStringBaseType(elementRef.typeName))
@@ -536,7 +540,7 @@ private:
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
     }
 
-    bool processType(const Position& position, const Xsd::Name& typeName)
+    bool processType(const Xsd::Name& typeName)
     {
         HashMap<Xsd::Name, Xsd::Type>::Iterator it = _output.types.find(typeName);
         if (it != _output.types.end())
@@ -556,7 +560,7 @@ private:
             return true;
         }
 
-        Position elementPos = findGlobalTypeByName(position, typeName);
+        Position elementPos = findGlobalTypeByName(typeName);
         if (!elementPos)
             return (_error = String::fromPrintf("Could not find type '%s'", (const char*)typeName.name)), false;
 
@@ -612,7 +616,7 @@ private:
                     Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                     type.kind = Xsd::Type::SimpleRefKind;
                     type.baseType = base;
-                    return processType(position, base);
+                    return processType(base);
                 }
                 return true;
             }
@@ -635,7 +639,7 @@ private:
                 type.memberTypes = memberTypes;
 
                 for (List<Xsd::Name>::Iterator i = memberTypes.begin(), end = memberTypes.end(); i != end; ++i)
-                    if (!processType(position, *i))
+                    if (!processType(*i))
                         return false;
                 return true;
             }
@@ -665,7 +669,7 @@ private:
                 else if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
                     return false;
 
-                if (!processType(position, type.baseType))
+                if (!processType(type.baseType))
                     return false;
                 return true;
             }
@@ -744,7 +748,7 @@ private:
                             if (!resolveNamespacePrefix(position, getXmlAttribute(element, "base"), baseTypeName))
                                 return false;
 
-                            if (!processType(position, baseTypeName))
+                            if (!processType(baseTypeName))
                                 return false;
 
                             if (!compareXsName(position, element.type, "restriction")) // todo: proper handling of restrictions
@@ -835,7 +839,7 @@ private:
                     Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                     type.kind = Xsd::Type::ElementKind;
 
-                    if (!processType(position, baseType))
+                    if (!processType(baseType))
                         return false;
                 
                     type.baseType = baseType;
@@ -860,7 +864,7 @@ private:
 
             if (refName.name == "lang" && refName.namespace_ == "http://www.w3.org/XML/1998/namespace")
             {
-                if (!processType(position, refName))
+                if (!processType(refName))
                     return false;
 
                 attribute.name.name = "lang";
@@ -870,7 +874,7 @@ private:
                 return true;
             }
 
-            const Position refAttribute = findGlobalRefByName(position, "attribute", refName);
+            const Position refAttribute = findGlobalRefByName("attribute", refName);
             if (!refAttribute)
                 return (_error = String::fromPrintf("Could not find attribute '%s'", (const char*)refName.name)), false;
             return processXsAttribute(refAttribute, attribute);
@@ -883,7 +887,7 @@ private:
             if (!resolveNamespacePrefix(position, typeName, typeNameResolved))
                 return false;
 
-            if (!processType(position, typeNameResolved))
+            if (!processType(typeNameResolved))
                 return false;
             attribute.typeName = typeNameResolved;
             attribute.name.name = getXmlAttribute(*position.element, "name");
@@ -1055,7 +1059,7 @@ private:
 
 }
 
-bool readXsd(const String& name_, const String& file, Xsd& xsd, String& error)
+bool readXsd(const String& name_, const String& file, const List<String>& forceTypeProcessing, Xsd& xsd, String& error)
 {
     String name = name_;
     if (name.isEmpty())
@@ -1067,7 +1071,7 @@ bool readXsd(const String& name_, const String& file, Xsd& xsd, String& error)
     }
 
     Reader reader(xsd);
-    if (!reader.read(file, name))
+    if (!reader.read(file, forceTypeProcessing, name))
         return error = reader.getError(), false;
 
     return true;

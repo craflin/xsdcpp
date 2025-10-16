@@ -1,23 +1,8 @@
 
+#include "../src/XmlParser.hpp"
 #include "../src/XmlParser.cpp"
 
 #include <gtest/gtest.h>
-
-void fixUnusedToTypeWarning()
-{
-    toType(Position(), nullptr, std::string());
-    toType<uint64_t>(Position(), std::string());
-    toType<int64_t>(Position(), std::string());
-    toType<uint32_t>(Position(), std::string());
-    toType<int32_t>(Position(), std::string());
-    toType<uint16_t>(Position(), std::string());
-    toType<int16_t>(Position(), std::string());
-    toType<double>(Position(), std::string());
-    toType<float>(Position(), std::string());
-    toType<bool>(Position(), std::string());
-    ElementContext elementContext;
-    parse(nullptr, nullptr, elementContext);
-}
 
 TEST(Parser, unescapeString)
 {
@@ -26,7 +11,7 @@ TEST(Parser, unescapeString)
         static std::string unescapeString(const std::string& testStr, const std::string& testSuffix)
         {
             std::string testData = testStr + testSuffix;
-            return ::unescapeString(testData.c_str(), testStr.size());
+            return xsdcpp::unescapeString(testData.c_str(), testStr.size());
         }
     };
 
@@ -49,7 +34,7 @@ TEST(Parser, stripComments)
         static std::string stripComments(const std::string& testStr, const std::string& testSuffix)
         {
             std::string testData = testStr + testSuffix;
-            return ::stripComments(testData.c_str(), testStr.size());
+            return xsdcpp::stripComments(testData.c_str(), testStr.size());
         }
     };
 

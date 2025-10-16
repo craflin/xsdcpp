@@ -15,11 +15,15 @@ int main(int argc, char* argv[])
     String inputFile;
     String outputDir = ".";
     String name;
+    List<String> externalNamespacePrefixes;
+    List<String> forceTypeProcessing;
     {
         Process::Option options[] = {
             {'o', "output", Process::argumentFlag},
             {'n', "name", Process::argumentFlag},
             {'h', "help", Process::optionFlag},
+            {'e', "extern", Process::argumentFlag},
+            {'t', "type", Process::argumentFlag},
             {1000, "version", Process::optionFlag},
         };
         Process::Arguments arguments(argc, argv, options);
@@ -33,6 +37,13 @@ int main(int argc, char* argv[])
                 break;
             case 'n':
                 name = argument;
+                break;
+            case 'e':
+                externalNamespacePrefixes.append(argument);
+                break;
+            case 't':
+                forceTypeProcessing.append(argument);
+                break;
             case ':':
                 Console::errorf("Option %s required an argument.\n", (const char*)argument);
                 return 1;
@@ -55,8 +66,8 @@ int main(int argc, char* argv[])
 
     String error;
     Xsd xsd;
-    if (!readXsd(name, inputFile, xsd, error) ||
-        !generateCpp(xsd, outputDir, error))
+    if (!readXsd(name, inputFile, forceTypeProcessing, xsd, error) ||
+        !generateCpp(xsd, outputDir, externalNamespacePrefixes, forceTypeProcessing, error))
     {
         Console::errorf("error: %s\n", (const char*)error);
         return 1;

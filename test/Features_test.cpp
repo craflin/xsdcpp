@@ -4,6 +4,7 @@
 #include "Choice.hpp"
 #include "Recursion.hpp"
 #include "SimpleTypeExtension.hpp"
+#include "Import.hpp"
 
 #include <gtest/gtest.h>
 
@@ -123,5 +124,19 @@ TEST(Features, SimpleTypeExtension)
         EXPECT_EQ(main.MyList[0][1], SimpleTypeExtension::MyList_item_t::B);
         EXPECT_EQ(main.MyList[0][2], SimpleTypeExtension::MyList_item_t::A);
     }
+}
 
+TEST(Features, Import)
+{
+    Import::MainType1 main;
+    Import::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main1 myList="C   B A" entity="test">B<MainInt>42</MainInt><Version>2.0</Version></Main1>)", main);
+    EXPECT_EQ(main, SimpleTypeExtension::XEnumZZ::B);
+    EXPECT_EQ(main.entity, "test");
+    EXPECT_EQ(main.myList.size(), 3);
+    EXPECT_EQ(main.myList[0], SimpleTypeExtension::MyList_item_t::C);
+    EXPECT_EQ(main.myList[1], SimpleTypeExtension::MyList_item_t::B);
+    EXPECT_EQ(main.myList[2], SimpleTypeExtension::MyList_item_t::A);
+    EXPECT_EQ(main.MainInt, 42);
+    EXPECT_EQ(main.Version, "2.0");
 }

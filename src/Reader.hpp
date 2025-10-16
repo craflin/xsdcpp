@@ -115,4 +115,4 @@ inline bool operator<(const Xsd::Name& lh, const Xsd::Name& rh)
     return lh.name < rh.name || (lh.name == rh.name && lh.namespace_ < rh.namespace_);
 }
 
-bool readXsd(const String& name, const String& file, Xsd& xsd, String& error);
+bool readXsd(const String& name, const String& file, const List<String>& forceTypeProcessing, Xsd& xsd, String& error);

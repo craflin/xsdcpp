@@ -5,32 +5,32 @@ add_custom_command(
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-types-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-interface-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-interface-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_interface_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_interface_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-interface-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/sca/sca-1.1-cd06-subset-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/sca/sca-1.1-cd06-subset-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/sca_1_1_cd06_subset_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/sca_1_1_cd06_subset_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/sca/sca-1.1-cd06-subset-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-implementation-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-implementation-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_implementation_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_implementation_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-implementation-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-deployment-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-deployment-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_deployment_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_deployment_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-deployment-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-logicalsystem-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-logicalsystem-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_logicalsystem_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_logicalsystem_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-logicalsystem-2.0.xsd"
 )
 add_custom_command(
-    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-project-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}"
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-project-2.0.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ecoa_project_2_0.hpp" "${CMAKE_CURRENT_BINARY_DIR}/ecoa_project_2_0.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/ecoa-project-2.0.xsd"
 )

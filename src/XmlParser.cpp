@@ -2,71 +2,9 @@
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
-#include <string>
-#include <cstdint>
-#include <unordered_map>
+#include <list>
 
-namespace {
-
-struct Context;
-struct ElementContext;
-struct Position;
-struct ElementInfo;
-
-typedef void (*add_text_t)(void*, const Position&, std::string&& name);
-typedef void* (*get_element_field_t)(void*);
-typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
-typedef void (*set_attribute_default_t)(void*);
-typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
-
-struct ChildElementInfo
-{
-    const char* name;
-    get_element_field_t getElementField;
-    const ElementInfo* info;
-    size_t minOccurs;
-    size_t maxOccurs;
-};
-
-struct AttributeInfo
-{
-    const char* name;
-    set_attribute_t setAttribute;
-    bool isMandatory;
-    set_attribute_default_t setDefaultValue;
-};
-
-struct ElementInfo
-{
-    enum ElementFlag
-    {
-        EntryPointFlag = 0x01,
-        ReadTextFlag = 0x02,
-        SkipProcessingFlag = 0x04,
-        AnyAttributeFlag = 0x08,
-        ProcessTextItemsFlag = 0x10
-    };
-    
-    size_t flags;
-    add_text_t addText;
-    const ChildElementInfo* children;
-    size_t childrenCount;
-    size_t mandatoryChildrenCount;
-    const AttributeInfo* attributes;
-    size_t attributesCount;
-    const ElementInfo* base;
-    set_any_attribute_t setOtherAttribute;
-};
-
-struct ElementContext
-{
-    const ElementInfo* info;
-    void* element;
-    std::unordered_map<const ChildElementInfo*, size_t> processedElements;
-    uint64_t processedAttributes;
-
-    ElementContext() : processedAttributes(0) {}
-};
+namespace xsdcpp {
 
 struct Position
 {
@@ -294,6 +232,26 @@ std::string unescapeString(const char* str, size_t len)
         result.push_back('&');
     sequenceTranslated:;
     }
+}
+
+bool getListItem(const char*& s, std::string& result)
+{
+    while (isspace(*s))
+        ++s;
+    if (!*s)
+        return false;
+    const char* end = strpbrk(s, " \t\n\r");
+    if (end)
+    {
+        result = std::string(s, end - s);
+        s = end;
+    }
+    else
+    {
+        result = s;
+        s += result.size();
+    }
+    return true;
 }
 
 std::string stripComments(const char* str, size_t len)
@@ -589,32 +547,7 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
-                if (elementContext.info->flags & ElementInfo::ProcessTextItemsFlag)
-                {
-                    const char* s = text.c_str();
-                    for (;;)
-                    {
-                        while (isspace(*s))
-                            ++s;
-                        if (!*s)
-                            break;
-                        const char* end = strpbrk(s, " \t\n\r");
-                        if (end)
-                        {
-                            std::string item(s, end - s);
-                            elementContext.info->addText(elementContext.element, context.pos, std::move(item));
-                        }
-                        else
-                        {
-                            std::string item(s);
-                            elementContext.info->addText(elementContext.element, context.pos, std::move(item));
-                            break;
-                        }
-                        s = end;
-                    }
-                }
-                else
-                    elementContext.info->addText(elementContext.element, context.pos, std::move(text));
+                elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
         else
