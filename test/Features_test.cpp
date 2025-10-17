@@ -5,6 +5,7 @@
 #include "Recursion.hpp"
 #include "SimpleTypeExtension.hpp"
 #include "Import.hpp"
+#include "Attributes.hpp"
 
 #include <gtest/gtest.h>
 
@@ -139,4 +140,39 @@ TEST(Features, Import)
     EXPECT_EQ(main.myList[2], SimpleTypeExtension::MyList_item_t::A);
     EXPECT_EQ(main.MainInt, 42);
     EXPECT_EQ(main.Version, "2.0");
+}
+
+TEST(Features, Attributes)
+{
+    {
+        Attributes::MainType1 main;
+        Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+        <Main1 required="test"/>)", main);
+        EXPECT_EQ(main.required, "test");
+        EXPECT_EQ(main.optional_with_default, "No");
+        EXPECT_FALSE(main.optional_without_default);
+        EXPECT_FALSE(main.optional_without_default_list);
+    }
+    {
+        Attributes::MainType1 main;
+        Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+        <Main1 required="test" optional_without_default="abc"/>)", main);
+        EXPECT_EQ(main.required, "test");
+        EXPECT_EQ(main.optional_with_default, "No");
+        EXPECT_EQ(main.optional_without_default, "abc");
+        EXPECT_FALSE(main.optional_without_default_list);
+    }
+    {
+        Attributes::MainType1 main;
+        Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+        <Main1 required="test" optional_without_default="abc" optional_without_default_list="item1  item2 item3"/>)", main);
+        EXPECT_EQ(main.required, "test");
+        EXPECT_EQ(main.optional_with_default, "No");
+        EXPECT_EQ(main.optional_without_default, "abc");
+        EXPECT_TRUE(main.optional_without_default_list);
+        EXPECT_EQ(main.optional_without_default_list->size(), 3);
+        EXPECT_EQ(main.optional_without_default_list->at(0), "item1");
+        EXPECT_EQ(main.optional_without_default_list->at(1), "item2");
+        EXPECT_EQ(main.optional_without_default_list->at(2), "item3");
+    }
 }

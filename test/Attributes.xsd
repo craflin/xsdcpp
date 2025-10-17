@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:local="http://whatever.x/local" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/local">
+
+    <xsd:complexType name="MainType1">
+        <xsd:attribute name="required" type="xsd:string" use="required" />
+        <xsd:attribute name="optional_with_default" type="xsd:string" default="No" />
+        <xsd:attribute name="optional_without_default" type="xsd:string"/>
+        <xsd:attribute name="optional_without_default_list" type="local:IdArray"/>
+    </xsd:complexType>
+
+    <xsd:simpleType name="IdArray">
+        <xsd:list itemType="xsd:string" />
+    </xsd:simpleType>
+
+    <xsd:element name="Main1" type="local:MainType1" />
+
+</xsd:schema>

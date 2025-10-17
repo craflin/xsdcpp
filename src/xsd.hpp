@@ -20,88 +20,95 @@ class optional
 {
 public:
     optional()
-        : _data2(nullptr)
+        : _data(nullptr)
     {
     }
     optional(const optional& other)
-        : _data2( other._data2 ? new T(*other._data2) : nullptr)
+        : _data(other._data ? new T(*other._data) : nullptr)
     {
     }
 
     optional(optional&& other)
     {
-        _data2 = other._data2;
-        other._data2 = nullptr;
+        _data = other._data;
+        other._data = nullptr;
     }
 
     optional(const T& other)
-        : _data2(new T(other))
+        : _data(new T(other))
     {
     }
 
     optional(T&& other)
-        : _data2(new T(std::move(other)))
+        : _data(new T(std::move(other)))
     {
     }
 
     ~optional()
     {
-        delete _data2;
+        delete _data;
     }
 
     optional& operator=(const optional& other)
     {
-        if (other._data2)
+        if (other._data)
         {
-            if (_data2)
-                *_data2 = *other._data2;
+            if (_data)
+                *_data = *other._data;
             else
-                _data2 = new T(*other._data2);
+                _data = new T(*other._data);
         }
         else
         {
-            delete _data2;
-            _data2 = nullptr;
+            delete _data;
+            _data = nullptr;
         }
         return *this;
     }
 
     optional& operator=(optional&& other)
     {
-        if (_data2)
-            delete _data2;
-        _data2 = other._data2;
-        other._data2 = nullptr;
+        if (_data)
+            delete _data;
+        _data = other._data;
+        other._data = nullptr;
         return *this;
     }
 
     optional& operator=(const T& other)
     {
-        if (_data2)
-            *_data2 = other;
+        if (_data)
+            *_data = other;
         else
-            _data2 = new T(other);
+            _data = new T(other);
         return *this;
     }
 
     optional& operator=(T&& other)
     {
-        if (_data2)
-            *_data2 = std::move(other);
+        if (_data)
+            *_data = std::move(other);
         else
-            _data2 = new T(std::move(other));
+            _data = new T(std::move(other));
         return *this;
     }
 
-    operator bool() const { return _data2 != nullptr; }
+    operator bool() const { return _data != nullptr; }
 
-    T& operator*() { return *_data2; }
-    const T& operator*() const { return *_data2; }
-    T* operator->() { return _data2; }
-    const T* operator->() const { return _data2; }
+    T& operator*() { return *_data; }
+    const T& operator*() const { return *_data; }
+    T* operator->() { return _data; }
+    const T* operator->() const { return _data; }
+
+    friend bool operator==(const optional& lh, const T& rh) { return lh._data && *lh._data == rh; }
+    friend bool operator!=(const optional& lh, const T& rh) { return !lh._data || *lh._data != rh; }
+    friend bool operator==(const T& lh, const optional& rh) { return rh._data && lh == rh._data; }
+    friend bool operator!=(const T& lh, const optional& rh) { return !rh._data || lh != rh._data; }
+    friend bool operator==(const optional& lh, const optional& rh) { return lh._data == rh._data || (lh._data && rh._data && *lh._data == *rh._data); }
+    friend bool operator!=(const optional& lh, const optional& rh) { return lh._data != rh._data && (!lh._data || !rh._data || *lh._data != *rh._data); }
 
 private:
-    T* _data2;
+    T* _data;
 };
 
 template <typename T>

@@ -57,6 +57,11 @@ add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Import.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Import.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Import.xsd"
 )
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Attributes.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Attributes.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Attributes.cpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Attributes.xsd"
+)
 add_executable(Features_test
     Features_test.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/SubstitutionGroup.hpp"
@@ -69,6 +74,8 @@ add_executable(Features_test
     "${CMAKE_CURRENT_BINARY_DIR}/SimpleTypeExtension.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Import.hpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Import.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Attributes.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Attributes.cpp"
 )
 target_require_cpp11(Features_test)
 target_link_libraries(Features_test PRIVATE mingtest::gtest mingtest::gtest_main)

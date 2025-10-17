@@ -4,6 +4,7 @@
 
 #include <nstd/Document/Xml.hpp>
 #include <nstd/HashSet.hpp>
+#include <nstd/Variant.hpp>
 
 struct Xsd
 {
@@ -18,7 +19,7 @@ struct Xsd
         Name name;
         Name typeName;
         bool isMandatory;
-        String defaultValue;
+        Variant defaultValue;
 
         AttributeRef() : isMandatory(false) {}
     };

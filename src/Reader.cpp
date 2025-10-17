@@ -5,6 +5,7 @@
 #include <nstd/File.hpp>
 #include <nstd/Console.hpp>
 #include <nstd/HashMap.hpp>
+#include <nstd/Variant.hpp>
 
 namespace {
 
@@ -30,6 +31,16 @@ String getXmlAttribute(const Xml::Element& element, const String& name, const St
         return defaultValue;
     return *it;
 }
+
+
+Variant getXmlAttributeVariant(const Xml::Element& element, const String& name, const Variant& defaultValue = Variant())
+{
+    HashMap<String, String>::Iterator it = element.attributes.find(name);
+    if (it == element.attributes.end())
+        return defaultValue;
+    return *it;
+}
+
 
 class Reader
 {
@@ -894,7 +905,7 @@ private:
             attribute.name.namespace_ = position.xsdFileData->targetNamespace;
             String use = getXmlAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
-            attribute.defaultValue = getXmlAttribute(*position.element, "default");
+            attribute.defaultValue = getXmlAttributeVariant(*position.element, "default");
             return true;
         }
 
@@ -907,7 +918,7 @@ private:
             attribute.typeName.namespace_ = position.xsdFileData->targetNamespace;
             String use = getXmlAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
-            attribute.defaultValue = getXmlAttribute(*position.element, "default");
+            attribute.defaultValue = getXmlAttributeVariant(*position.element, "default");
 
             for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
             {
