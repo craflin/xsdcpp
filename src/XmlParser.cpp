@@ -13,6 +13,11 @@ struct Position
     const char* lineStart;
 };
 
+}
+
+
+namespace {
+
 struct Token
 {
     enum Type
@@ -28,18 +33,18 @@ struct Token
 
     Type type;
     std::string value;
-    Position pos;
+    xsdcpp::Position pos;
 };
 
 struct Context
 {
-    Position pos;
+    xsdcpp::Position pos;
     Token token;
     const char** namespaces;
     std::unordered_map<std::string, size_t> namespacePrefixToIndex;
 };
 
-void skipSpace(Position& pos)
+void skipSpace(xsdcpp::Position& pos)
 {
     for (char c;;)
         switch ((c = *pos.pos))
@@ -106,21 +111,21 @@ void skipSpace(Position& pos)
         }
 }
 
-void throwSyntaxException(const Position& pos, const std::string& error)
+void throwSyntaxException(const xsdcpp::Position& pos, const std::string& error)
 {
     std::stringstream s;
     s << "Syntax error at line '" << pos.line << "': " << error;
     throw std::runtime_error(s.str());
 }
 
-void throwVerificationException(const Position& pos, const std::string& error)
+void throwVerificationException(const xsdcpp::Position& pos, const std::string& error)
 {
     std::stringstream s;
     s << "Error at line '" << pos.line << "': " << error;
     throw std::runtime_error(s.str());
 }
 
-void skipText(Position& pos)
+void skipText(xsdcpp::Position& pos)
 {
     for (;;)
     {
@@ -234,26 +239,6 @@ std::string unescapeString(const char* str, size_t len)
     }
 }
 
-bool getListItem(const char*& s, std::string& result)
-{
-    while (isspace(*s))
-        ++s;
-    if (!*s)
-        return false;
-    const char* end = strpbrk(s, " \t\n\r");
-    if (end)
-    {
-        result = std::string(s, end - s);
-        s = end;
-    }
-    else
-    {
-        result = s;
-        s += result.size();
-    }
-    return true;
-}
-
 std::string stripComments(const char* str, size_t len)
 {
     std::string result;
@@ -357,7 +342,7 @@ void skipTextAndSubElements(Context& context, const std::string& elementName)
     for (;;)
     {
         skipText(context.pos);
-        Position posBackup = context.pos;
+        xsdcpp::Position posBackup = context.pos;
         readToken(context);
         switch (context.token.type)
         {
@@ -384,7 +369,7 @@ void skipTextAndSubElements(Context& context, const std::string& elementName)
     }
 }
 
-void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name_, ElementContext& elementContext)
+void enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const std::string& name_, xsdcpp::ElementContext& elementContext)
 {
     std::string nameWithoutNamespace;
     const std::string* name = &name_;
@@ -394,8 +379,8 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
         nameWithoutNamespace = name_.substr(n + 1);
         name = &nameWithoutNamespace;
     }
-    for (const ElementInfo* i = parentElementContext.info; i; i = i->base)
-        if (const ChildElementInfo* c = i->children)
+    for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+        if (const xsdcpp::ChildElementInfo* c = i->children)
             for (; c->name; ++c)
                 if (*name == c->name)
                 {
@@ -415,14 +400,14 @@ void enterElement(Context& context, ElementContext& parentElementContext, const 
     throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
 }
 
-void checkElement(Context& context, const ElementContext& elementContext)
+void checkElement(Context& context, const xsdcpp::ElementContext& elementContext)
 {
     if (elementContext.info->mandatoryChildrenCount)
-        for (const ElementInfo* i = elementContext.info; i; i = i->base)
-            if (const ChildElementInfo* c = i->children)
+        for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+            if (const xsdcpp::ChildElementInfo* c = i->children)
                 for (; c->name; ++c)
                 {
-                    std::unordered_map<const ChildElementInfo*, size_t>::const_iterator it = elementContext.processedElements.find(c);
+                    std::unordered_map<const xsdcpp::ChildElementInfo*, size_t>::const_iterator it = elementContext.processedElements.find(c);
                     size_t count = it == elementContext.processedElements.end() ? 0 : it->second;
                     if (count < c->minOccurs)
                     {
@@ -433,11 +418,11 @@ void checkElement(Context& context, const ElementContext& elementContext)
                 }
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, std::string&& name, std::string&& value)
+void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std::string&& name, std::string&& value)
 {
     uint64_t attribute = 1;
-    for (const ElementInfo* i = elementContext.info; i; i = i->base)
-        if (const AttributeInfo* a = i->attributes)
+    for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+        if (const xsdcpp::AttributeInfo* a = i->attributes)
             for (; a->name; ++a, attribute <<= 1)
                 if (name == a->name)
                 {
@@ -447,7 +432,7 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
                     a->setValue(a->getAttribute(elementContext.element), context.pos, std::move(value));
                     return;
                 }
-    if (elementContext.info->flags & ElementInfo::EntryPointFlag)
+    if (elementContext.info->flags & xsdcpp::ElementInfo::EntryPointFlag)
     {
         if (name.compare(0, 5, "xmlns") == 0 && (name.size() == 5 || name.c_str()[5] == ':'))
         {
@@ -471,8 +456,8 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
                 return;
         }
     }
-    for (const ElementInfo* i = elementContext.info; i; i = i->base)
-        if (i->flags & ElementInfo::AnyAttributeFlag)
+    for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+        if (i->flags & xsdcpp::ElementInfo::AnyAttributeFlag)
         {
             i->setOtherAttribute(elementContext.element, std::move(name), std::move(value));
             return;
@@ -481,15 +466,15 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
     throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
-void checkAttributes(Context& context, ElementContext& elementContext)
+void checkAttributes(Context& context, xsdcpp::ElementContext& elementContext)
 {
     uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
     uint64_t missingAttributes = attributes & ~elementContext.processedAttributes;
     if (missingAttributes)
     {
         uint64_t attribute = 1;
-        for (const ElementInfo* i = elementContext.info; i; i = i->base)
-            if (const AttributeInfo* a = i->attributes)
+        for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+            if (const xsdcpp::AttributeInfo* a = i->attributes)
                 for (; a->name; ++a, attribute <<= 1)
                     if (missingAttributes & attribute)
                     {
@@ -501,13 +486,13 @@ void checkAttributes(Context& context, ElementContext& elementContext)
     }
 }
 
-void parseElement(Context& context, ElementContext& parentElementContext)
+void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext)
 {
     readToken(context);
     if (context.token.type != Token::nameType)
         throwSyntaxException(context.token.pos, "Expected tag name");
     std::string elementName = std::move(context.token.value);
-    ElementContext elementContext;
+    xsdcpp::ElementContext elementContext;
     enterElement(context, parentElementContext, elementName, elementContext);
     for (;;)
     {
@@ -537,10 +522,10 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     checkAttributes(context, elementContext);
     for (;;)
     {
-        if (elementContext.info->flags & ElementInfo::ReadTextFlag)
+        if (elementContext.info->flags & xsdcpp::ElementInfo::ReadTextFlag)
         {
             const char* start = context.pos.pos;
-            if (elementContext.info->flags & ElementInfo::SkipProcessingFlag)
+            if (elementContext.info->flags & xsdcpp::ElementInfo::SkipProcessingFlag)
                 skipTextAndSubElements(context, elementName);
             else
                 skipText(context.pos);
@@ -573,6 +558,30 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     if (context.token.type != Token::tagEndType)
         throwSyntaxException(context.token.pos, "Expected '>'");
     checkElement(context, elementContext);
+}
+
+}
+
+namespace xsdcpp {
+
+bool getListItem(const char*& s, std::string& result)
+{
+    while (isspace(*s))
+        ++s;
+    if (!*s)
+        return false;
+    const char* end = strpbrk(s, " \t\n\r");
+    if (end)
+    {
+        result = std::string(s, end - s);
+        s = end;
+    }
+    else
+    {
+        result = s;
+        s += result.size();
+    }
+    return true;
 }
 
 void parse(const char* data, const char** namespaces, ElementContext& elementContext)

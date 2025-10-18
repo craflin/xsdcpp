@@ -5,7 +5,6 @@
 
 namespace xsdcpp {
 
-struct Context;
 struct ElementContext;
 struct Position;
 struct ElementInfo;

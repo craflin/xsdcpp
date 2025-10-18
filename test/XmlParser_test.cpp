@@ -11,7 +11,7 @@ TEST(Parser, unescapeString)
         static std::string unescapeString(const std::string& testStr, const std::string& testSuffix)
         {
             std::string testData = testStr + testSuffix;
-            return xsdcpp::unescapeString(testData.c_str(), testStr.size());
+            return ::unescapeString(testData.c_str(), testStr.size());
         }
     };
 
@@ -34,7 +34,7 @@ TEST(Parser, stripComments)
         static std::string stripComments(const std::string& testStr, const std::string& testSuffix)
         {
             std::string testData = testStr + testSuffix;
-            return xsdcpp::stripComments(testData.c_str(), testStr.size());
+            return ::stripComments(testData.c_str(), testStr.size());
         }
     };
 
