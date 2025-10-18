@@ -55,7 +55,7 @@ public:
     Generator(const Xsd& xsd, const List<String>& externalNamespacePrefixes, const List<String>& forceTypeProcessing, List<String>& cppOutput, List<String>& hppOutput)
         : _xsd(xsd)
         , _externalNamespacePrefixes(externalNamespacePrefixes)
-        , _cppOutput(cppOutput)
+        , _cppOutputFinal(cppOutput)
         , _hppOutput(hppOutput)
     {
         for (List<String>::Iterator i = forceTypeProcessing.begin(), end = forceTypeProcessing.end(); i != end; ++i)
@@ -72,7 +72,6 @@ public:
     bool process()
     {
         _cppNamespace = toCppIdentifier(_xsd.name);
-
 
         HashSet<Xsd::Name> localElementTypes;
         HashSet<Xsd::Name> localSubstitutionGroupTypes;
@@ -94,45 +93,41 @@ public:
         if (!collectReferencedExternalTypes(localElementTypes, externalTypes))
             return false;
 
-        _cppOutput.append("");
-        _cppOutput.append(String("#include \"") + _cppNamespace + ".hpp\"");
-        _cppOutput.append("");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(String("#include \"") + _cppNamespace + ".hpp\"");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append("#include <fstream>");
+        _cppOutputFinal.append("#include <sstream>");
+        _cppOutputFinal.append("");
 
-        _cppOutput.append("namespace {");
-        _cppOutput.append("");
-
-        _cppOutput.append("const char* _namespaces[] = {");
-        for (HashSet<String>::Iterator i = _xsd.targetNamespaces.begin(), end = _xsd.targetNamespaces.end(); i != end; ++i)
-            _cppOutput.append(String("    ") + toCStringLiteral(*i) + ",");
-        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema-instance") == _xsd.targetNamespaces.end())
-            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema-instance\",");
-        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema") == _xsd.targetNamespaces.end())
-            _cppOutput.append("    \"http://www.w3.org/2001/XMLSchema\",");
-        _cppOutput.append("    nullptr");
-        _cppOutput.append("};");
-        _cppOutput.append("");
-
-        _cppOutput.append("}");
-        _cppOutput.append("");
 
         for (HashMap<String, HashSet<Xsd::Name>>::Iterator i = externalTypes.begin(), end = externalTypes.end(); i != end; ++i)
         {
-            _cppOutput.append(String("namespace ") + i.key() + " {");
-            _cppOutput.append("");
+            _cppOutputFinal.append(String("namespace ") + i.key() + " {");
+            _cppOutputFinal.append("");
             const HashSet<Xsd::Name>& types = *i;
             for (HashSet<Xsd::Name>::Iterator i = types.begin(), end = types.end(); i != end; ++i)
             {
                 String cppName = toCppTypeIdentifier2(*i);
-                _cppOutput.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
-                _cppOutput.append(String("void set_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(*i) + "*, const xsdcpp::Position&, std::string&&);");
+                _cppOutputFinal.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
+                _cppOutputFinal.append(String("void set_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(*i) + "*, const xsdcpp::Position&, std::string&&);");
             }
-            _cppOutput.append("");
-            _cppOutput.append("}");
-            _cppOutput.append("");
+            _cppOutputFinal.append("");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
         }
 
-        _cppOutput.append(String("namespace ") + _cppNamespace + " {");
-        _cppOutput.append("");
+
+        _cppOutputAnonymousFieldGetter.append("const char* _namespaces[] = {");
+        for (HashSet<String>::Iterator i = _xsd.targetNamespaces.begin(), end = _xsd.targetNamespaces.end(); i != end; ++i)
+            _cppOutputAnonymousFieldGetter.append(String("    ") + toCStringLiteral(*i) + ",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema-instance") == _xsd.targetNamespaces.end())
+            _cppOutputAnonymousFieldGetter.append("    \"http://www.w3.org/2001/XMLSchema-instance\",");
+        if (_xsd.targetNamespaces.find("http://www.w3.org/2001/XMLSchema") == _xsd.targetNamespaces.end())
+            _cppOutputAnonymousFieldGetter.append("    \"http://www.w3.org/2001/XMLSchema\",");
+        _cppOutputAnonymousFieldGetter.append("    nullptr");
+        _cppOutputAnonymousFieldGetter.append("};");
+        _cppOutputAnonymousFieldGetter.append("");
 
         _hppOutput.append("");
         _hppOutput.append("#pragma once");
@@ -157,14 +152,13 @@ public:
             if (*i == _xsd.rootType)
                 continue;
             String cppName = toCppTypeIdentifier2(*i);
-            _cppOutput.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
+            _cppOutputNamespaceElementInfoExtern.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
             _hppOutput.append(String("struct ") + cppName + ";");
         }
         for (HashSet<Xsd::Name>::Iterator i = localSimpleElementTypes.begin(), end = localSimpleElementTypes.end(); i != end; ++i)
-            _cppOutput.append(String("extern const xsdcpp::ElementInfo _") + toCppTypeIdentifier2(*i) + "_Info;");
+            _cppOutputNamespaceElementInfoExtern.append(String("extern const xsdcpp::ElementInfo _") + toCppTypeIdentifier2(*i) + "_Info;");
         for (HashSet<Xsd::Name>::Iterator i = localSubstitutionGroupTypes.begin(), end = localSubstitutionGroupTypes.end(); i != end; ++i)
             _hppOutput.append(String("struct ") + toCppTypeIdentifier2(*i) + ";");
-        _cppOutput.append("");
         _hppOutput.append("");
 
         if (!processType2(_xsd.rootType, 0, true))
@@ -192,15 +186,44 @@ public:
 
         _hppOutput.append("}");
 
-        _cppOutput.append("}");
-        _cppOutput.append("");
-        _cppOutput.append("#include <fstream>");
-        _cppOutput.append("#include <system_error>");
-        _cppOutput.append("#include <sstream>");
-        _cppOutput.append("");
+        //_cppOutput.append("");
+        //_cppOutput.append("#include <fstream>");
+        //_cppOutput.append("#include <system_error>");
+        //_cppOutput.append("#include <sstream>");
+        //_cppOutput.append("");
 
-        _cppOutput.append(String("namespace ") + _cppNamespace + " {");
-        _cppOutput.append("");
+        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(_cppOutputNamespaceElementInfoExtern);
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append("}");
+        _cppOutputFinal.append("");
+
+        _cppOutputFinal.append("namespace {");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(_cppOutputAnonymousEnumValues);
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append("}");
+        _cppOutputFinal.append("");
+
+        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(_cppOutputNamespaceSetValue);
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append("}");
+        _cppOutputFinal.append("");
+
+        _cppOutputFinal.append("namespace {");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(_cppOutputAnonymousFieldGetter);
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append("}");
+        _cppOutputFinal.append("");
+
+        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        _cppOutputFinal.append("");
+        _cppOutputFinal.append(_cppOutputNamespace);
+        _cppOutputFinal.append("");
 
         String rootTypeCppName = toCppTypeIdentifier2(_xsd.rootType);
         for (List<Xsd::ElementRef>::Iterator i = rootType.elements.begin(), end = rootType.elements.end(); i != end; ++i)
@@ -208,30 +231,32 @@ public:
             String elementTypeCppName = toCppTypeIdentifier2(i->typeName);
             String elementCppName = toCppFieldIdentifier(i->name);
 
-            _cppOutput.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
-            _cppOutput.append("{");
-            _cppOutput.append(String("    ") + rootTypeCppName + " rootElement;");
-            _cppOutput.append("    xsdcpp::ElementContext elementContext;");
-            _cppOutput.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
-            _cppOutput.append("    elementContext.element = &rootElement;");
-            _cppOutput.append("    xsdcpp::parse(data.c_str(), _namespaces, elementContext);");
-            _cppOutput.append(String("    output = std::move(rootElement.") + elementCppName + ");");
-            _cppOutput.append("}");
-            _cppOutput.append("");
+            _cppOutputFinal.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
+            _cppOutputFinal.append("{");
+            _cppOutputFinal.append(String("    ") + rootTypeCppName + " rootElement;");
+            _cppOutputFinal.append("    xsdcpp::ElementContext elementContext;");
+            _cppOutputFinal.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
+            _cppOutputFinal.append("    elementContext.element = &rootElement;");
+            _cppOutputFinal.append("    xsdcpp::parse(data.c_str(), _namespaces, elementContext);");
+            _cppOutputFinal.append(String("    output = std::move(rootElement.") + elementCppName + ");");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
 
-            _cppOutput.append(String("void load_file(const std::string& filePath, ") + elementTypeCppName + "& output)");
-            _cppOutput.append("{");
-            _cppOutput.append("    std::fstream file;");
-            _cppOutput.append("    file.exceptions(std::fstream::failbit | std::fstream::badbit);");
-            _cppOutput.append("    file.open(filePath, std::fstream::in);");
-            _cppOutput.append("    std::stringstream buffer;");
-            _cppOutput.append("    buffer << file.rdbuf();");
-            _cppOutput.append("    load_data(buffer.str(), output);");
-            _cppOutput.append("}");
-            _cppOutput.append("");
+            _cppOutputFinal.append(String("void load_file(const std::string& filePath, ") + elementTypeCppName + "& output)");
+            _cppOutputFinal.append("{");
+            _cppOutputFinal.append("    std::fstream file;");
+            _cppOutputFinal.append("    file.exceptions(std::fstream::failbit | std::fstream::badbit);");
+            _cppOutputFinal.append("    file.open(filePath, std::fstream::in);");
+            _cppOutputFinal.append("    std::stringstream buffer;");
+            _cppOutputFinal.append("    buffer << file.rdbuf();");
+            _cppOutputFinal.append("    load_data(buffer.str(), output);");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
         }
 
-        _cppOutput.append("}");
+
+        _cppOutputFinal.append("}");
+        _cppOutputFinal.append("");
 
         return true;
     }
@@ -242,7 +267,12 @@ private:
 
     HashMap<String, String> _externalNamespaces;
 
-    List<String>& _cppOutput;
+    List<String>& _cppOutputFinal;
+    List<String> _cppOutputNamespaceElementInfoExtern;
+    List<String> _cppOutputAnonymousEnumValues;
+    List<String> _cppOutputNamespaceSetValue;
+    List<String> _cppOutputAnonymousFieldGetter;
+    List<String> _cppOutputNamespace;
     List<String>& _hppOutput;
     String _cppNamespace;
     HashSet<Xsd::Name> _generatedTypes2;
@@ -308,8 +338,8 @@ private:
     String toCppTypeIdentifierWithNamespace2(const Xsd::Name& typeName)
     {
         String result = toCppTypeIdentifier2(typeName);
-
-        if (result == "xsd::string" || 
+        if (result == "_root_t" ||
+            result == "xsd::string" || 
             result == "uint64_t" ||
             result == "int64_t" ||
             result == "uint32_t" ||
@@ -668,11 +698,11 @@ private:
                 return true; // you don't need a setter for such an element
             if (!generateTypeSetter(baseTypeName))
                 return false;
-            _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { " + toCppTypeIdentifierWithNamespace2(baseTypeName) + "& base = *obj; " + toSetValueFunctionName(baseTypeName) + "(&base, pos, std::move(val)); }");
+            _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { " + toCppTypeIdentifierWithNamespace2(baseTypeName) + "& base = *obj; " + toSetValueFunctionName(baseTypeName) + "(&base, pos, std::move(val)); }");
 
         }
         else if (type.kind == Xsd::Type::Kind::StringKind || type.kind == Xsd::Type::Kind::UnionKind)
-            _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { xsdcpp::set_string(obj, pos, std::move(val)); }");
+            _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { xsdcpp::set_string(obj, pos, std::move(val)); }");
         else if (type.kind == Xsd::Type::Kind::ListKind)
         {
             const Xsd::Name& itemTypeName = type.baseType;
@@ -680,28 +710,27 @@ private:
                 return false;
             Xsd::Type itemType = getType(itemTypeName);
              if (itemType.kind == Xsd::Type::Kind::StringKind || itemType.kind == Xsd::Type::Kind::UnionKind)
-                _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { const char* s = val.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) { obj->emplace_back(std::move(item)); } }");
+                _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { const char* s = val.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) { obj->emplace_back(std::move(item)); } }");
             else
-                _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { const char* s = val.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) { obj->emplace_back(); " + toSetValueFunctionName(itemTypeName) + "(&obj->back(), pos, std::move(item)); } }");
+                _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { const char* s = val.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) { obj->emplace_back(); " + toSetValueFunctionName(itemTypeName) + "(&obj->back(), pos, std::move(item)); } }");
         }
         else if (type.kind == Xsd::Type::Kind::EnumKind)
         {
-            _cppOutput.append(String("const char* _") + cppName + "_Values2[] = {");
+            _cppOutputAnonymousEnumValues.append(String("const char* _") + cppName + "_Values[] = {");
             for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-                _cppOutput.append(String("    \"") + *i + "\",");
-            _cppOutput.append("    nullptr};");
-            _cppOutput.append("");
+                _cppOutputAnonymousEnumValues.append(String("    \"") + *i + "\",");
+            _cppOutputAnonymousEnumValues.append("    nullptr};");
+            _cppOutputAnonymousEnumValues.append("");
 
-            _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { *obj = (" + cppNameWithNamespace + ")xsdcpp::toNumeric(pos, " + toCppNamespacePrefix(typeName) + "::_" + cppName + "_Values2, val); }");
+            _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { *obj = (" + cppNameWithNamespace + ")xsdcpp::toNumeric(pos, _" + cppName + "_Values, val); }");
         }
         else
         {
             if (!generateTypeSetter(type.baseType))
                 return false;
-            _cppOutput.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { " + toSetValueFunctionName(type.baseType)  + "(obj, pos, std::move(val)); }");
+            _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { " + toSetValueFunctionName(type.baseType)  + "(obj, pos, std::move(val)); }");
         }
         
-        _generatedTypeSetters.append(typeName);
         return true;
     }
 
@@ -753,7 +782,7 @@ private:
             flagsStr.join(flags, '|');
 
         String cppName = toCppTypeIdentifier2(typeName);
-        _cppOutput.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr + ", " + addTextFunction + " };");
+        _cppOutputNamespaceSetValue.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr + ", " + addTextFunction + " };");
 
         _generatedElementInfos2.append(typeName);
         return true;
@@ -978,7 +1007,7 @@ private:
             structDefintiion.append("");
 
             if (level == 0)
-                _cppOutput.append(structDefintiion);
+                _cppOutputAnonymousFieldGetter.append(structDefintiion);
             else
                 _hppOutput.append(structDefintiion);
 
@@ -997,21 +1026,21 @@ private:
                             return false;
 
                         if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                            _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + "." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + "." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
                         else if (elementRef.maxOccurs == 1)
-                            _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*((parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "())->" + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*((parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "())->" + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
                         else
-                            _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &*(parent->" + toCppFieldIdentifier(elementRef.name) + ".back()." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "()));}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &*(parent->" + toCppFieldIdentifier(elementRef.name) + ".back()." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "()));}");
                     }
                 }
                 else
                 {
                     if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                        _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &parent->" + toCppFieldIdentifier(elementRef.name) + ";}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &parent->" + toCppFieldIdentifier(elementRef.name) + ";}");
                     else if (elementRef.maxOccurs == 1)
-                        _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "());}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "());}");
                     else
-                        _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppFieldIdentifier(elementRef.name) + ".back());}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppFieldIdentifier(elementRef.name) + ".back());}");
                 }
             }
 
@@ -1051,7 +1080,7 @@ private:
                     }
                 }
                 childElementInfo.append("    {nullptr}\n};");
-                _cppOutput.append(childElementInfo);
+                _cppOutputAnonymousFieldGetter.append(childElementInfo);
             }
 
 
@@ -1072,9 +1101,9 @@ private:
 
                 bool optionalWithoutDefaultValue = !attributeRef.isMandatory && attributeRef.defaultValue.isNull();
                 if (optionalWithoutDefaultValue)
-                    _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &*(elem->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "()); }");
+                    _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &*(elem->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "()); }");
                 else
-                    _cppOutput.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &elem->" + toCppFieldIdentifier(attributeRef.name) + "; }");
+                    _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &elem->" + toCppFieldIdentifier(attributeRef.name) + "; }");
 
                 if (!attributeRef.isMandatory && !attributeRef.defaultValue.isNull())
                 {
@@ -1083,18 +1112,18 @@ private:
                     if (resolvedDefaultValue != "\"\"")
                     {
                         setDefaultValueFunctions.append(&attributeRef);
-                        _cppOutput.append(String("void default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolvedDefaultValue + "; }");
+                        _cppOutputAnonymousFieldGetter.append(String("void default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolvedDefaultValue + "; }");
                     }
                 }
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
-                _cppOutput.append(String("void any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
+                _cppOutputAnonymousFieldGetter.append(String("void any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
             {
                 attributes = String("_") + cppName + "_Attributes";
-                _cppOutput.append(String("xsdcpp::AttributeInfo _") + cppName + "_Attributes[] = {");
+                _cppOutputAnonymousFieldGetter.append(String("xsdcpp::AttributeInfo _") + cppName + "_Attributes[] = {");
                 for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
                 {
                     const Xsd::AttributeRef& attributeRef = *i;
@@ -1103,9 +1132,9 @@ private:
                     String setDefault("nullptr");
                     if (setDefaultValueFunctions.contains(&attributeRef))
                         setDefault = String("(xsdcpp::set_default_t)&default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
-                    _cppOutput.append(String("    {\"") + attributeRef.name.name + "\", (xsdcpp::get_field_t)&get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", (xsdcpp::get_field_t)&get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
-                _cppOutput.append("    {nullptr}\n};");
+                _cppOutputAnonymousFieldGetter.append("    {nullptr}\n};");
             }
 
             usize childrenCount = getChildrenCount(typeName);
@@ -1129,13 +1158,12 @@ private:
             if (!flags.isEmpty())
                 flagsStr.join(flags, '|');
 
-            _cppOutput.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
+            _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
                 + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&any_") + cppName : String("nullptr"))
                 + " };");
-            _cppOutput.append("");
 
             _generatedElementInfos2.append(typeName);
 
