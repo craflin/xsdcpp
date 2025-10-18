@@ -11,7 +11,7 @@ struct Xsd
     struct Name
     {
         String name;
-        String namespace_;
+        String xsdNamespace;
     };
 
     struct AttributeRef // todo: rename to Attribute
@@ -95,7 +95,7 @@ struct Xsd
 
 inline usize hash(const Xsd::Name& name)
 {
-    usize result = hash(name.namespace_);
+    usize result = hash(name.xsdNamespace);
     result *= 16807;
     result ^= hash(name.name);
     return result;
@@ -103,17 +103,17 @@ inline usize hash(const Xsd::Name& name)
 
 inline bool operator==(const Xsd::Name& lh, const Xsd::Name& rh)
 {
-    return lh.name == rh.name && lh.namespace_ == rh.namespace_;
+    return lh.name == rh.name && lh.xsdNamespace == rh.xsdNamespace;
 }
 
 inline bool operator>(const Xsd::Name& lh, const Xsd::Name& rh)
 {
-    return lh.name > rh.name || (lh.name == rh.name && lh.namespace_ > rh.namespace_);
+    return lh.name > rh.name || (lh.name == rh.name && lh.xsdNamespace > rh.xsdNamespace);
 }
 
 inline bool operator<(const Xsd::Name& lh, const Xsd::Name& rh)
 {
-    return lh.name < rh.name || (lh.name == rh.name && lh.namespace_ < rh.namespace_);
+    return lh.name < rh.name || (lh.name == rh.name && lh.xsdNamespace < rh.xsdNamespace);
 }
 
 bool readXsd(const String& name, const String& file, const List<String>& forceTypeProcessing, Xsd& xsd, String& error);

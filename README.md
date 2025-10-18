@@ -38,15 +38,17 @@ Notable supported features:
 * attribute presence validation,
 * substitution groups,
 * lax and skip content processing,
+* optional attributes,
 * any attributes.
 
 Known missing feature are:
 * proper element occurrence validation,
 * attribute regex validation,
-* correct processing of namespaced element or attribute names.
+* correct processing of namespaced element or attribute names,
+* proper support for union types.
 
 ## Build Instructions
 
 * Clone the Git repository.
 * Initialize submodules.
-* Build the project using CMake.
+* Build the project using CMake or Conan.

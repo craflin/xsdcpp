@@ -68,8 +68,7 @@ public:
             {
                 Xsd::Name typeName;
                 typeName.name = *i;
-                typeName.namespace_ = _namespaces.begin().key();
-                //Console::printf("Processing '%s'...\n", (const char*)typeName.name);
+                typeName.xsdNamespace = _namespaces.begin().key();
                 if (!processType(typeName))
                     return false;
             }
@@ -294,23 +293,23 @@ private:
 
     static bool compareXsName(const Xsd::Name& name, const String& rh)
     {
-        return name.namespace_ == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
+        return name.xsdNamespace == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
     }
 
     static bool isXsStringBaseType(const Xsd::Name& typeName)
     {
-        if (typeName.namespace_ == "http://www.w3.org/2001/XMLSchema")
+        if (typeName.xsdNamespace == "http://www.w3.org/2001/XMLSchema")
             return typeName.name == "normalizedString" || typeName.name == "string" || 
             typeName.name == "anySimpleType" || typeName.name == "anyURI" || typeName.name == "NCName" || typeName.name == "QName" ||
             typeName.name == "dateTime" || typeName.name == "base64Binary";
-        else if(typeName.namespace_ == "http://www.w3.org/XML/1998/namespace")
+        else if(typeName.xsdNamespace == "http://www.w3.org/XML/1998/namespace")
             return typeName.name == "lang";
         return false;
     }
 
     static bool isXsNumericBaseType(const Xsd::Name& typeName)
     {
-        if (typeName.namespace_ == "http://www.w3.org/2001/XMLSchema")
+        if (typeName.xsdNamespace == "http://www.w3.org/2001/XMLSchema")
             return typeName.name == "nonNegativeInteger" || typeName.name == "positiveInteger" || typeName.name == "integer" ||
                 typeName.name == "int" || typeName.name == "long" || typeName.name == "short" ||
                 typeName.name == "unsignedInt" || typeName.name == "unsignedLong" || typeName.name == "unsignedShort" ||
@@ -322,7 +321,7 @@ private:
 
     Position findGlobalTypeByName(const Xsd::Name& name)
     {
-        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
+        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.xsdNamespace);
         if (it2 == _namespaces.end())
             return Position();
         NamespaceData& namespaceData = *it2;
@@ -351,7 +350,7 @@ private:
 
     Position findGlobalRefByName(const String& xsElementNameWithoutPrefix, const Xsd::Name& name)
     {
-        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.namespace_);
+        HashMap<String, NamespaceData>::Iterator it2 = _namespaces.find(name.xsdNamespace);
         if (it2 == _namespaces.end())
             return Position();
         NamespaceData& namespaceData = *it2;
@@ -406,16 +405,16 @@ private:
             HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(namespacePrefix);
             if (it == position.xsdFileData->prefixToNamespaceMap.end())
                 return (_error = String::fromPrintf("Could not resolve namespace prefix '%s'", (const char*)namespacePrefix)), false;
-            result.namespace_ = *it;
+            result.xsdNamespace = *it;
             result.name = typeNameWithNamespacePrefix.substr(namespacePrefix.length() + 1);
         }
         else
         {
             HashMap<String, String>::Iterator it = position.xsdFileData->prefixToNamespaceMap.find(String());
             if (it == position.xsdFileData->prefixToNamespaceMap.end())
-                result.namespace_.clear();
+                result.xsdNamespace.clear();
             else
-                result.namespace_ = *it;
+                result.xsdNamespace = *it;
             result.name = typeNameWithNamespacePrefix;
         }
         return true;
@@ -462,16 +461,16 @@ private:
                 String name = getXmlAttribute(*position.element, "name");
 
                 elementRef.typeName.name = parentTypeName.name + "_" + name + "_t";
-                elementRef.typeName.namespace_ = position.xsdFileData->targetNamespace;
+                elementRef.typeName.xsdNamespace = position.xsdFileData->targetNamespace;
 
                 Xsd::Type& type = _output.types.append(elementRef.typeName, Xsd::Type());
                 type.kind = Xsd::Type::ElementKind;
                 type.baseType.name = "string";
-                type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                type.baseType.xsdNamespace = "http://www.w3.org/2001/XMLSchema";
             }
 
             elementRef.name.name = getXmlAttribute(*position.element, "name");
-            elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
+            elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
             elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
             elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
 
@@ -521,7 +520,7 @@ private:
         if (!name.isEmpty())
         {
             elementRef.typeName.name = parentTypeName.name + "_" + name + "_t";
-            elementRef.typeName.namespace_ = position.xsdFileData->targetNamespace;
+            elementRef.typeName.xsdNamespace = position.xsdFileData->targetNamespace;
 
             for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
             {
@@ -539,7 +538,7 @@ private:
                         return false;
 
                     elementRef.name.name = getXmlAttribute(*position.element, "name");
-                    elementRef.name.namespace_ = position.xsdFileData->targetNamespace;
+                    elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
                     elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
                     elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
                     return true;
@@ -674,7 +673,7 @@ private:
                     else
                     {
                         type.baseType.name  = "anySimpleType";
-                        type.baseType.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                        type.baseType.xsdNamespace = "http://www.w3.org/2001/XMLSchema";
                     }
                 }
                 else if (!resolveNamespacePrefix(position, itemTypeStr, type.baseType))
@@ -701,7 +700,7 @@ private:
             if (mixed == "true")
             {
                 baseTypeName.name = "string";
-                baseTypeName.namespace_ = "http://www.w3.org/2001/XMLSchema";
+                baseTypeName.xsdNamespace = "http://www.w3.org/2001/XMLSchema";
             }
 
             for (List<Xml::Variant>::Iterator i = element.content.begin(), end = element.content.end(); i != end; ++i)
@@ -873,13 +872,13 @@ private:
             if (!resolveNamespacePrefix(position, ref, refName))
                 return false;
 
-            if (refName.name == "lang" && refName.namespace_ == "http://www.w3.org/XML/1998/namespace")
+            if (refName.name == "lang" && refName.xsdNamespace == "http://www.w3.org/XML/1998/namespace")
             {
                 if (!processType(refName))
                     return false;
 
                 attribute.name.name = "lang";
-                attribute.name.namespace_ = position.xsdFileData->targetNamespace;
+                attribute.name.xsdNamespace = position.xsdFileData->targetNamespace;
                 attribute.typeName = refName;
                 attribute.isMandatory = false;
                 return true;
@@ -902,7 +901,7 @@ private:
                 return false;
             attribute.typeName = typeNameResolved;
             attribute.name.name = getXmlAttribute(*position.element, "name");
-            attribute.name.namespace_ = position.xsdFileData->targetNamespace;
+            attribute.name.xsdNamespace = position.xsdFileData->targetNamespace;
             String use = getXmlAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
             attribute.defaultValue = getXmlAttributeVariant(*position.element, "default");
@@ -913,9 +912,9 @@ private:
         if (!name.isEmpty())
         {
             attribute.name.name = name;
-            attribute.name.namespace_ = position.xsdFileData->targetNamespace;
+            attribute.name.xsdNamespace = position.xsdFileData->targetNamespace;
             attribute.typeName.name = name + "_t";
-            attribute.typeName.namespace_ = position.xsdFileData->targetNamespace;
+            attribute.typeName.xsdNamespace = position.xsdFileData->targetNamespace;
             String use = getXmlAttribute(*position.element, "use");
             attribute.isMandatory = use == "required";
             attribute.defaultValue = getXmlAttributeVariant(*position.element, "default");

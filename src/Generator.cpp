@@ -47,7 +47,7 @@ String toCStringLiteral(const String& str)
 
 bool compareXsName(const Xsd::Name& name, const String& rh)
 {
-    return name.namespace_ == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
+    return name.xsdNamespace == "http://www.w3.org/2001/XMLSchema" && name.name == rh;
 }
 
 class Generator
@@ -63,7 +63,7 @@ public:
         {
             Xsd::Name typeName;
             typeName.name = *i;
-            typeName.namespace_ = _xsd.targetNamespaces.front();
+            typeName.xsdNamespace = _xsd.targetNamespaces.front();
             _requiredTypes.append(typeName);
         }
     }
@@ -86,7 +86,7 @@ public:
         for (Map<Xsd::Name, String>::Iterator i = elementTypes.begin(), end = elementTypes.end(); i != end; ++i)
         {
             String namespacePrefix;
-            if (isNamespaceExternal(i.key().namespace_, namespacePrefix))
+            if (isNamespaceExternal(i.key().xsdNamespace, namespacePrefix))
             {
                 if (!externalElementTypes.contains(namespacePrefix))
                     externalElementTypes.insert(namespacePrefix, List<String>());
@@ -97,7 +97,7 @@ public:
         for (Map<Xsd::Name, String>::Iterator i = enumTypes.begin(), end = enumTypes.end(); i != end; ++i)
         {
             String namespacePrefix;
-            if (isNamespaceExternal(i.key().namespace_, namespacePrefix))
+            if (isNamespaceExternal(i.key().xsdNamespace, namespacePrefix))
             {
                 if (!externalEnumTypes.contains(namespacePrefix))
                     externalEnumTypes.insert(namespacePrefix, List<String>());
@@ -179,7 +179,7 @@ public:
             const String& cppName = *i;
             if (i.key() == _xsd.rootType)
                 continue;
-            if (!isNamespaceExternal(i.key().namespace_))
+            if (!isNamespaceExternal(i.key().xsdNamespace))
             {
                 _cppOutput.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
                 if (_xsd.types.find(i.key())->kind == Xsd::Type::Kind::ElementKind)
@@ -189,7 +189,7 @@ public:
         for (Map<Xsd::Name, String>::Iterator i = substitutionGroupTypes.begin(), end = substitutionGroupTypes.end(); i != end; ++i)
         {
             const String& cppName = *i;
-            if (!isNamespaceExternal(i.key().namespace_))
+            if (!isNamespaceExternal(i.key().xsdNamespace))
                 _hppOutput.append(String("struct ") + cppName + ";");
         }
         _cppOutput.append("");
@@ -324,9 +324,9 @@ private:
             }
         }
 
-        if (typeName.namespace_ == _xsd.targetNamespaces.front() || isNamespaceExternal(typeName.namespace_))
+        if (typeName.xsdNamespace == _xsd.targetNamespaces.front() || isNamespaceExternal(typeName.xsdNamespace))
             return toCppIdentifier(typeName.name);
-        HashMap<String, String>::Iterator it2 = _xsd.namespaceToSuggestedPrefix.find(typeName.namespace_);
+        HashMap<String, String>::Iterator it2 = _xsd.namespaceToSuggestedPrefix.find(typeName.xsdNamespace);
         if (it2 != _xsd.namespaceToSuggestedPrefix.end())
             return toCppIdentifier(*it2 + "_" + typeName.name);
         return toCppIdentifier(typeName.name);
@@ -347,7 +347,7 @@ private:
             result == "bool")
             return result;
         String namespacePrefix;
-        if (isNamespaceExternal(typeName.namespace_, namespacePrefix))
+        if (isNamespaceExternal(typeName.xsdNamespace, namespacePrefix))
             return namespacePrefix + "::" + result;
         return _cppNamespace + "::" + result;
     }
@@ -355,7 +355,7 @@ private:
     String toCppNamespacePrefix(const Xsd::Name& typeName)
     {
         String namespacePrefix;
-        if (isNamespaceExternal(typeName.namespace_, namespacePrefix))
+        if (isNamespaceExternal(typeName.xsdNamespace, namespacePrefix))
             return namespacePrefix;
         return _cppNamespace;
     }
@@ -581,7 +581,7 @@ private:
         if (_generatedTypes2.contains(typeName))
             return true;
 
-        if (isNamespaceExternal(typeName.namespace_))
+        if (isNamespaceExternal(typeName.xsdNamespace))
         {
             _generatedTypes2.append(typeName);
             return true;
@@ -657,7 +657,7 @@ private:
         if (type.kind == Xsd::Type::ElementKind)
             return true;
 
-        if (isNamespaceExternal(typeName.namespace_))
+        if (isNamespaceExternal(typeName.xsdNamespace))
         {
             _generatedElementInfos2.append(typeName);
             return true;
