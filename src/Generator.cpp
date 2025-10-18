@@ -439,6 +439,11 @@ private:
         return *it2;
     }
 
+    Xsd::Type getRootType(const Xsd::Name& typeName) const
+    {
+        return getType(getRootTypeName(typeName));
+    }
+
     ReadTextMode getReadTextMode(const Xsd::Name& typeName) const
     {
         Xsd::Type rootType = getType(getRootTypeName(typeName));
@@ -462,17 +467,6 @@ private:
         result.append(str);
         result.append("\"");
         return result;
-    }
-
-    const Xsd::Type& resolveFinalType(const Xsd::Type& type)
-    {
-        if (type.kind == Xsd::Type::SimpleRefKind)
-        {
-            HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(type.baseType);
-            if (it != _xsd.types.end())
-                return resolveFinalType(*it);
-        }
-        return type;
     }
 
     String resolveDefaultValue(const Xsd::Name& attributeTypeName, const Xsd::Type& finalType, const String& defaultValue)
@@ -994,23 +988,23 @@ private:
                 HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(attributeRef.typeName);
                 if (it == _xsd.types.end())
                     return false;
-                Xsd::Type& attributeType = *it;
-                const Xsd::Type& finalAttributeType = resolveFinalType(attributeType);
-                if (finalAttributeType.kind == Xsd::Type::StringKind || finalAttributeType.kind == Xsd::Type::UnionKind)
+                const Xsd::Type& attributeType = *it;
+                Xsd::Type rootTye = getRootType(attributeRef.typeName);
+                if (rootTye.kind == Xsd::Type::StringKind || rootTye.kind == Xsd::Type::UnionKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position&, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = std::move(value); }");
-                else if (finalAttributeType.kind == Xsd::Type::EnumKind)
+                else if (rootTye.kind == Xsd::Type::EnumKind)
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = (" + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + ")xsdcpp::toType(pos, " + toCppNamespacePrefix(attributeRef.typeName) + "::_" + toCppTypeIdentifier2(attributeRef.typeName) + "_Values, value); }");
-                else if (finalAttributeType.kind == Xsd::Type::ListKind)
+                else if (rootTye.kind == Xsd::Type::ListKind)
                 {
-                    Xsd::Type itemType = getType(finalAttributeType.baseType);
-                    String itemTypeCppName =toCppTypeIdentifier2(finalAttributeType.baseType);
-                    String itemTypeCppNameWithNamespace = toCppTypeIdentifierWithNamespace2(finalAttributeType.baseType);
+                    Xsd::Type itemType = getType(rootTye.baseType);
+                    String itemTypeCppName = toCppTypeIdentifier2(rootTye.baseType);
+                    String itemTypeCppNameWithNamespace = toCppTypeIdentifierWithNamespace2(rootTye.baseType);
 
                     bool optionalWithoutDefaultValue = !attributeRef.isMandatory && attributeRef.defaultValue.isNull();
                     if (optionalWithoutDefaultValue)
                     {
                         if (itemType.kind == Xsd::Type::Kind::EnumKind)
-                            _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) +"(); const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + "->emplace_back((" + itemTypeCppNameWithNamespace + ")xsdcpp::toType(pos, " + toCppNamespacePrefix(finalAttributeType.baseType) + "::_" + itemTypeCppName + "_Values, item)); }");
+                            _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) +"(); const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + "->emplace_back((" + itemTypeCppNameWithNamespace + ")xsdcpp::toType(pos, " + toCppNamespacePrefix(rootTye.baseType) + "::_" + itemTypeCppName + "_Values, item)); }");
                         else if (itemType.kind == Xsd::Type::Kind::StringKind)
                             _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) +"(); const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + "->emplace_back(std::move(item)); }");
                         else
@@ -1019,7 +1013,7 @@ private:
                     else
                     {
                         if (itemType.kind == Xsd::Type::Kind::EnumKind)
-                            _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + ".emplace_back((" + itemTypeCppNameWithNamespace + ")xsdcpp::toType(pos, " + toCppNamespacePrefix(finalAttributeType.baseType) + "::_" + itemTypeCppName + "_Values, item)); }");
+                            _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + ".emplace_back((" + itemTypeCppNameWithNamespace + ")xsdcpp::toType(pos, " + toCppNamespacePrefix(rootTye.baseType) + "::_" + itemTypeCppName + "_Values, item)); }");
                         else if (itemType.kind == Xsd::Type::Kind::StringKind)
                             _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { const char* s = value.c_str(); std::string item; while (xsdcpp::getListItem(s, item)) element->" + toCppFieldIdentifier(attributeRef.name) + ".emplace_back(std::move(item)); }");
                         else
@@ -1030,7 +1024,7 @@ private:
                     _cppOutput.append(String("void set_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, const xsdcpp::Position& pos, std::string&& value) { element->" + toCppFieldIdentifier(attributeRef.name) + " = xsdcpp::toType<" + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + ">(pos, value); }");
             
                 if (!attributeRef.isMandatory && !attributeRef.defaultValue.isNull())
-                    _cppOutput.append(String("void default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeRef.typeName, finalAttributeType, attributeRef.defaultValue.toString()) + "; }");
+                    _cppOutput.append(String("void default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolveDefaultValue(attributeRef.typeName, rootTye, attributeRef.defaultValue.toString()) + "; }");
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 _cppOutput.append(String("void any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
