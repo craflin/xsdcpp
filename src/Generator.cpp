@@ -110,7 +110,7 @@ public:
             {
                 String cppName = toCppTypeIdentifier2(*i);
                 _cppOutputFinal.append(String("extern const xsdcpp::ElementInfo _") + cppName + "_Info;");
-                _cppOutputFinal.append(String("void set_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(*i) + "*, const xsdcpp::Position&, std::string&&);");
+                _cppOutputFinal.append(String("void _set_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(*i) + "*, const xsdcpp::Position&, std::string&&);");
             }
             _cppOutputFinal.append("");
             _cppOutputFinal.append("}");
@@ -379,7 +379,7 @@ private:
             cppName == "float" ||
             cppName == "bool")
             return String("xsdcpp::set_") + cppName;
-        return toCppNamespacePrefix(typeName) + "::set_" + cppName;
+        return toCppNamespacePrefix(typeName) + "::_set_" + cppName;
     }
 
     usize getChildrenCount(const Xsd::Name& typeName) const
@@ -689,7 +689,7 @@ private:
 
         Xsd::Type& type = *it2;
         String cppNameWithNamespace = toCppTypeIdentifierWithNamespace2(typeName);
-        String functionName = String("set_") + cppName;
+        String functionName = String("_set_") + cppName;
 
         if (type.kind == Xsd::Type::Kind::ElementKind)
         {
@@ -1026,21 +1026,21 @@ private:
                             return false;
 
                         if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + "." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + "." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
                         else if (elementRef.maxOccurs == 1)
-                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*((parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "())->" + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*((parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "())->" + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "());}");
                         else
-                            _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &*(parent->" + toCppFieldIdentifier(elementRef.name) + ".back()." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "()));}");
+                            _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &*(parent->" + toCppFieldIdentifier(elementRef.name) + ".back()." + toCppFieldIdentifier(subElementRef.name) + " = " +  toCppTypeIdentifierWithNamespace2(subElementRef.typeName) + "()));}");
                     }
                 }
                 else
                 {
                     if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &parent->" + toCppFieldIdentifier(elementRef.name) + ";}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &parent->" + toCppFieldIdentifier(elementRef.name) + ";}");
                     else if (elementRef.maxOccurs == 1)
-                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "());}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return &*(parent->" + toCppFieldIdentifier(elementRef.name) + " = " + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "());}");
                     else
-                        _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppFieldIdentifier(elementRef.name) + ".back());}");
+                        _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(elementRef.name) + "(" + cppNameWithNamespace + "* parent) {return (parent->" + toCppFieldIdentifier(elementRef.name) + ".emplace_back(), &parent->" + toCppFieldIdentifier(elementRef.name) + ".back());}");
                 }
             }
 
@@ -1068,7 +1068,7 @@ private:
                             if (!generateElementInfo(subElementRef.typeName))
                                 return false;
 
-                            childElementInfo.append(String("    {\"") + subElementRef.name.name + "\", (xsdcpp::get_field_t)&get_" + cppName +  "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + ", &" + toCppNamespacePrefix(subElementRef.typeName) + "::_" + toCppTypeIdentifier2(subElementRef.typeName) + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                            childElementInfo.append(String("    {\"") + subElementRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName +  "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + ", &" + toCppNamespacePrefix(subElementRef.typeName) + "::_" + toCppTypeIdentifier2(subElementRef.typeName) + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
                         }
                     }
                     else
@@ -1076,7 +1076,7 @@ private:
                         if (!generateElementInfo(elementRef.typeName))
                             return false;
 
-                        childElementInfo.append(String("    {\"") + elementRef.name.name + "\", (xsdcpp::get_field_t)&get_" + cppName + "_" + toCppFieldIdentifier(elementRef.name) + ", &" + toCppNamespacePrefix(elementRef.typeName) + "::_" + toCppTypeIdentifier2(elementRef.typeName) + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                        childElementInfo.append(String("    {\"") + elementRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(elementRef.name) + ", &" + toCppNamespacePrefix(elementRef.typeName) + "::_" + toCppTypeIdentifier2(elementRef.typeName) + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
                     }
                 }
                 childElementInfo.append("    {nullptr}\n};");
@@ -1101,9 +1101,9 @@ private:
 
                 bool optionalWithoutDefaultValue = !attributeRef.isMandatory && attributeRef.defaultValue.isNull();
                 if (optionalWithoutDefaultValue)
-                    _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &*(elem->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "()); }");
+                    _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &*(elem->" + toCppFieldIdentifier(attributeRef.name) + " = " + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "()); }");
                 else
-                    _cppOutputAnonymousFieldGetter.append(String("void* get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &elem->" + toCppFieldIdentifier(attributeRef.name) + "; }");
+                    _cppOutputAnonymousFieldGetter.append(String("void* _get_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* elem) { return &elem->" + toCppFieldIdentifier(attributeRef.name) + "; }");
 
                 if (!attributeRef.isMandatory && !attributeRef.defaultValue.isNull())
                 {
@@ -1112,12 +1112,12 @@ private:
                     if (resolvedDefaultValue != "\"\"")
                     {
                         setDefaultValueFunctions.append(&attributeRef);
-                        _cppOutputAnonymousFieldGetter.append(String("void default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolvedDefaultValue + "; }");
+                        _cppOutputAnonymousFieldGetter.append(String("void _default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolvedDefaultValue + "; }");
                     }
                 }
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
-                _cppOutputAnonymousFieldGetter.append(String("void any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
+                _cppOutputAnonymousFieldGetter.append(String("void _any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
@@ -1131,8 +1131,8 @@ private:
                         return false;
                     String setDefault("nullptr");
                     if (setDefaultValueFunctions.contains(&attributeRef))
-                        setDefault = String("(xsdcpp::set_default_t)&default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
-                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", (xsdcpp::get_field_t)&get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                        setDefault = String("(xsdcpp::set_default_t)&_default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
+                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
                 _cppOutputAnonymousFieldGetter.append("    {nullptr}\n};");
             }
@@ -1162,7 +1162,7 @@ private:
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
                 + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
-                + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&any_") + cppName : String("nullptr"))
+                + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
                 + " };");
 
             _generatedElementInfos2.append(typeName);
