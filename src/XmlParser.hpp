@@ -10,16 +10,15 @@ struct ElementContext;
 struct Position;
 struct ElementInfo;
 
-typedef void (*add_text_t)(void*, const Position&, std::string&& name);
-typedef void* (*get_element_field_t)(void*);
-typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
-typedef void (*set_attribute_default_t)(void*);
+typedef void* (*get_field_t)(void*);
+typedef void (*set_value_t)(void* obj, const Position&, std::string&&);
+typedef void (*set_default_t)(void*);
 typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
 
 struct ChildElementInfo
 {
     const char* name;
-    get_element_field_t getElementField;
+    get_field_t getElementField;
     const ElementInfo* info;
     size_t minOccurs;
     size_t maxOccurs;
@@ -28,9 +27,10 @@ struct ChildElementInfo
 struct AttributeInfo
 {
     const char* name;
-    set_attribute_t setAttribute;
+    get_field_t getAttribute;
+    set_value_t setValue;
     bool isMandatory;
-    set_attribute_default_t setDefaultValue;
+    set_default_t setDefaultValue;
 };
 
 struct ElementInfo
@@ -44,7 +44,7 @@ struct ElementInfo
     };
     
     size_t flags;
-    add_text_t addText;
+    set_value_t addText;
     const ChildElementInfo* children;
     size_t childrenCount;
     size_t mandatoryChildrenCount;
@@ -68,9 +68,18 @@ void parse(const char* data, const char** namespaces, ElementContext& elementCon
 
 bool getListItem(const char*& s, std::string& result);
 
-uint32_t toType(const Position& pos, const char* const* values, const std::string& value);
+uint32_t toNumeric(const Position& pos, const char* const* values, const std::string& value);
 
-template <typename T>
-T toType(const Position& pos, const std::string& value);
+void set_string(std::string* obj,const Position&, std::string&& val);
+void set_uint64_t(uint64_t* obj, const Position& pos, std::string&& val);
+void set_int64_t(int64_t* obj, const Position& pos, std::string&& val);
+void set_uint32_t(uint32_t* obj, const Position& pos, std::string&& val);
+void set_int32_t(int32_t* obj, const Position& pos, std::string&& val);
+void set_uint16_t(uint16_t* obj, const Position& pos, std::string&& val);
+void set_int16_t(int16_t* obj, const Position& pos, std::string&& val);
+void set_float(float* obj, const Position& pos, std::string&& val);
+void set_double(double* obj, const Position& pos, std::string&& val);
+void set_bool(bool* obj, const Position& pos, std::string&& val);
+
 
 }

@@ -444,7 +444,7 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
                     if (elementContext.processedAttributes & attribute)
                         throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
                     elementContext.processedAttributes |= attribute;
-                    a->setAttribute(elementContext.element, context.pos, std::move(value));
+                    a->setValue(a->getAttribute(elementContext.element), context.pos, std::move(value));
                     return;
                 }
     if (elementContext.info->flags & ElementInfo::EntryPointFlag)
@@ -607,7 +607,7 @@ void parse(const char* data, const char** namespaces, ElementContext& elementCon
     parseElement(context, elementContext);
 }
 
-uint32_t toType(const Position& pos, const char* const* values, const std::string& value)
+uint32_t toNumeric(const Position& pos, const char* const* values, const std::string& value)
 {
     for (const char* const* i = values; *i; ++i)
         if (value == *i)
@@ -616,43 +616,15 @@ uint32_t toType(const Position& pos, const char* const* values, const std::strin
     return 0;
 }
 
-template <typename T>
-T toType(const Position& pos, const std::string& value) { throwVerificationException(pos, "Not implemented"); return T(); }
-
-template <typename T>
-T toType(const Position& pos, const std::string& value, const char* exceptionMessage)
-{
-    std::stringstream ss(value);
-    T result;
-    if (!(ss >> result))
-         throwVerificationException(pos, exceptionMessage);
-    return result;
-}
-
-template <>
-uint64_t toType<uint64_t>(const Position& pos, const std::string& value) { return toType<uint64_t>(pos, value,  "Expected unsigned 64-bit integer value"); }
-template <>
-int64_t toType<int64_t>(const Position& pos, const std::string& value) { return toType<int64_t>(pos, value,  "Expected 64-bit integer value"); }
-template <>
-uint32_t toType<uint32_t>(const Position& pos, const std::string& value) { return toType<uint32_t>(pos, value,  "Expected unsigned 32-bit integer value"); }
-template <>
-int32_t toType<int32_t>(const Position& pos, const std::string& value) { return toType<int32_t>(pos, value,  "Expected 32-bit integer value"); }
-template <>
-uint16_t toType<uint16_t>(const Position& pos, const std::string& value) { return toType<uint16_t>(pos, value,  "Expected unsigned 16-bit integer value"); }
-template <>
-int16_t toType<int16_t>(const Position& pos, const std::string& value) { return toType<int16_t>(pos, value,  "Expected 16-bit integer value"); }
-template <>
-double toType<double>(const Position& pos, const std::string& value) { return toType<double>(pos, value,  "Expected single precision floating point value"); }
-template <>
-float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
-template <>
-bool toType<bool>(const Position& pos, const std::string& value)
-{
-    std::stringstream ss(value);
-    bool result;
-    if (!(ss >> std::boolalpha >> result))
-         throwVerificationException(pos, "Expected boolean value");
-    return result;
-}
+void set_string(std::string* obj, const Position&, std::string&& val) { if (obj->empty()) *obj = std::move(val); else *obj += val; }
+void set_uint64_t(uint64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected unsigned 64-bit integer value"); }
+void set_int64_t(int64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected 64-bit integer value"); }
+void set_uint32_t(uint32_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected unsigned 32-bit integer value"); }
+void set_int32_t(int32_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected 32-bit integer value"); }
+void set_uint16_t(uint16_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected unsigned 16-bit integer value"); }
+void set_int16_t(int16_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected 16-bit integer value"); }
+void set_float(float* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected single precision floating point value"); }
+void set_double(double* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected double precision floating point value"); }
+void set_bool(bool* obj, const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> std::boolalpha >> *obj)) throwVerificationException(pos, "Expected boolean value"); }
 
 }

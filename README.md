@@ -39,13 +39,18 @@ Notable supported features:
 * substitution groups,
 * lax and skip content processing,
 * optional attributes,
-* any attributes.
+* any attributes,
+* Unicode escape sequence handling.
 
 Known missing feature are:
 * proper element occurrence validation,
 * attribute regex validation,
 * correct processing of namespaced element or attribute names,
 * proper support for union types.
+
+Intentionally not supported features:
+* codecs other than UTF-8,
+* element sequence validation.
 
 ## Build Instructions
 
