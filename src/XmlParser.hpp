@@ -26,7 +26,7 @@ struct ChildElementInfo
 struct AttributeInfo
 {
     const char* name;
-    size_t trackIndex;
+    uint64_t trackBit;
     get_field_t getAttribute;
     set_value_t setValue;
     bool isMandatory;
@@ -49,7 +49,7 @@ struct ElementInfo
     size_t childrenCount;
     size_t mandatoryChildrenCount;
     const AttributeInfo* attributes;
-    size_t attributesCount;
+    uint64_t checkAttributeMask;
     const ElementInfo* base;
     set_any_attribute_t setOtherAttribute;
 };

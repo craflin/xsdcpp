@@ -142,7 +142,33 @@ TEST(Features, Import)
     EXPECT_EQ(main.Version, "2.0");
 }
 
-TEST(Features, Attributes)
+TEST(Features, Attribute_DefaultValue)
+{
+    Attributes::MainType1 main;
+    Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main1 required="test"/>)", main);
+    EXPECT_EQ(main.required, "test");
+    EXPECT_EQ(main.optional_with_default, "No");
+    EXPECT_FALSE(main.optional_without_default);
+    EXPECT_FALSE(main.optional_without_default_list);
+}
+
+TEST(Features, Attribute_ListType)
+{
+    Attributes::MainType1 main;
+    Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main1 required="test" optional_without_default="abc" optional_without_default_list="item1  item2 item3"/>)", main);
+    EXPECT_EQ(main.required, "test");
+    EXPECT_EQ(main.optional_with_default, "No");
+    EXPECT_EQ(main.optional_without_default, "abc");
+    EXPECT_TRUE(main.optional_without_default_list);
+    EXPECT_EQ(main.optional_without_default_list->size(), 3);
+    EXPECT_EQ(main.optional_without_default_list->at(0), "item1");
+    EXPECT_EQ(main.optional_without_default_list->at(1), "item2");
+    EXPECT_EQ(main.optional_without_default_list->at(2), "item3");
+}
+
+TEST(Features, Attribute_Optional)
 {
     {
         Attributes::MainType1 main;
@@ -162,17 +188,59 @@ TEST(Features, Attributes)
         EXPECT_EQ(main.optional_without_default, "abc");
         EXPECT_FALSE(main.optional_without_default_list);
     }
+}
+
+TEST(Features, Attribute_Duplicated)
+{
+    Attributes::MainType1 main;
+    try
     {
-        Attributes::MainType1 main;
         Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
-        <Main1 required="test" optional_without_default="abc" optional_without_default_list="item1  item2 item3"/>)", main);
-        EXPECT_EQ(main.required, "test");
-        EXPECT_EQ(main.optional_with_default, "No");
-        EXPECT_EQ(main.optional_without_default, "abc");
-        EXPECT_TRUE(main.optional_without_default_list);
-        EXPECT_EQ(main.optional_without_default_list->size(), 3);
-        EXPECT_EQ(main.optional_without_default_list->at(0), "item1");
-        EXPECT_EQ(main.optional_without_default_list->at(1), "item2");
-        EXPECT_EQ(main.optional_without_default_list->at(2), "item3");
+<Main1 required="test" required="test"/>)", main);
+        FAIL();
+    }
+    catch(const std::exception& e)
+    {
+        EXPECT_EQ(std::string(e.what()), "Error at line '2': Repeated attribute 'required'");
     }
 }
+
+TEST(Features, Attribute_Missing)
+{
+    Attributes::MainType1 main;
+    try
+    {
+        Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+<Main1/>)", main);
+        FAIL();
+    }
+    catch(const std::exception& e)
+    {
+        EXPECT_EQ(std::string(e.what()), "Error at line '2': Missing attribute 'required'");
+    }
+}
+
+
+TEST(Features, Attribute_Unexpected)
+{
+    Attributes::MainType1 main;
+    try
+    {
+        Attributes::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+<Main1 not_defined_in_xsd="test"/>)", main);
+        FAIL();
+    }
+    catch(const std::exception& e)
+    {
+        EXPECT_EQ(std::string(e.what()), "Error at line '2': Unexpected attribute 'not_defined_in_xsd'");
+    }
+}
+
+
+// todo:
+
+// Int Attribute out of range
+// Invalid Enum Attribute
+// Attribute not matching pattern
+// Too Many Elements
+// Missing Element

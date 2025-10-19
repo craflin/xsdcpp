@@ -274,6 +274,8 @@ private:
     HashSet<Xsd::Name> _generatedTypes2;
     HashSet<Xsd::Name> _generatedElementInfos2;
     HashSet<Xsd::Name> _generatedTypeSetters;
+    HashSet<const Xsd::AttributeRef*> _generatedAttributeSetDefaultValueFunctions;
+    HashMap<const Xsd::AttributeRef*, uint64> _generatedAttributeTrackBits;
     HashSet<Xsd::Name> _requiredTypes;
     String _error;
 
@@ -416,6 +418,24 @@ private:
             return 0;
         const Xsd::Type& type = *it;
         return type.attributes.size() + getAttributesCount(type.baseType);
+    }
+
+    uint64 getCheckAttributesMask(const Xsd::Name& typeName) const
+    {
+        if (typeName.name.isEmpty())
+            return 0;
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return 0;
+        const Xsd::Type& type = *it;
+        uint64 result = getCheckAttributesMask(type.baseType);
+        for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+        {
+            const Xsd::AttributeRef& attribute = *i;
+            if (attribute.isMandatory || _generatedAttributeSetDefaultValueFunctions.contains(&attribute))
+                result |= *_generatedAttributeTrackBits.find(&attribute);
+        }
+        return result;
     }
 
     enum ReadTextMode
@@ -1085,8 +1105,6 @@ private:
                 _cppOutputAnonymousFieldGetter.append(childElementInfo);
             }
 
-
-            HashSet<const Xsd::AttributeRef*> setDefaultValueFunctions;
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
             {
                 const Xsd::AttributeRef& attributeRef = *i;
@@ -1113,7 +1131,7 @@ private:
                     String resolvedDefaultValue = resolveDefaultValue(attributeRef.typeName, rootType, attributeRef.defaultValue.toString());
                     if (resolvedDefaultValue != "\"\"")
                     {
-                        setDefaultValueFunctions.append(&attributeRef);
+                        _generatedAttributeSetDefaultValueFunctions.append(&attributeRef);
                         _cppOutputAnonymousFieldGetter.append(String("void _default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element) { element->" + toCppFieldIdentifier(attributeRef.name) + " = " + resolvedDefaultValue + "; }");
                     }
                 }
@@ -1133,11 +1151,14 @@ private:
                         return false;
 
                     usize trackIndex = nextAttributeTrackIndex++;
+                    uint64 trackBit = (uint64)1 << trackIndex;
+
+                    _generatedAttributeTrackBits.append(&attributeRef, trackBit);
 
                     String setDefault("nullptr");
-                    if (setDefaultValueFunctions.contains(&attributeRef))
+                    if (_generatedAttributeSetDefaultValueFunctions.contains(&attributeRef))
                         setDefault = String("(xsdcpp::set_default_t)&_default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
-                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", " + String::fromUInt((uint)trackIndex) + ", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", " + String::fromUInt64(trackBit) + ", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
                 _cppOutputAnonymousFieldGetter.append("    {nullptr}\n};");
             }
@@ -1145,6 +1166,7 @@ private:
             usize childrenCount = getChildrenCount(typeName);
             usize mandatoryChildrenCount = getMandatoryChildrenCount(typeName);
             uint64 attributesCount = getAttributesCount(typeName);
+            uint64 checkAttributesMask = getCheckAttributesMask(typeName);
             List<String> flags;
             if (level == 1)
                 flags.append("xsdcpp::ElementInfo::EntryPointFlag");
@@ -1166,7 +1188,8 @@ private:
             _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
-                + ", " + attributes + ", " + String::fromUInt64(attributesCount) + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
+                + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) 
+                + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
                 + " };");
 

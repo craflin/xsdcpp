@@ -420,10 +420,9 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
             for (; a->name; ++a)
                 if (name == a->name)
                 {
-                    uint64_t attributeBit = 1 << a->trackIndex;
-                    if (elementContext.processedAttributes2 & attributeBit)
+                    if (elementContext.processedAttributes2 & a->trackBit)
                         throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
-                    elementContext.processedAttributes2 |= attributeBit;
+                    elementContext.processedAttributes2 |= a->trackBit;
                     a->setValue(a->getAttribute(elementContext.element), context.pos, std::move(value));
                     return;
                 }
@@ -464,19 +463,17 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
 
 void checkAttributes(Context& context, xsdcpp::ElementContext& elementContext)
 {
-    uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
-    uint64_t missingAttributes = attributes & ~elementContext.processedAttributes2;
+    uint64_t missingAttributes = elementContext.info->checkAttributeMask & ~elementContext.processedAttributes2;
     if (missingAttributes)
     {
         for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
             if (const xsdcpp::AttributeInfo* a = i->attributes)
                 for (; a->name; ++a)
-                    if (missingAttributes & (1 << a->trackIndex))
+                    if (missingAttributes & a->trackBit)
                     {
                         if (a->isMandatory)
                             throwVerificationException(context.pos, "Missing attribute '" + std::string(a->name) + "'");
-                        if (a->setDefaultValue)
-                            a->setDefaultValue(elementContext.element);
+                        a->setDefaultValue(elementContext.element);
                     }
     }
 }
