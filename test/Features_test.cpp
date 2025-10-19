@@ -6,6 +6,7 @@
 #include "SimpleTypeExtension.hpp"
 #include "Import.hpp"
 #include "Attributes.hpp"
+#include "Occurrence.hpp"
 
 #include <gtest/gtest.h>
 
@@ -236,11 +237,52 @@ TEST(Features, Attribute_Unexpected)
     }
 }
 
+TEST(Features, Element_Occurrence)
+{
+    {
+        Occurrence::Main main;
+        Occurrence::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main><MyElement name="name1"/></Main>)", main);
+        EXPECT_EQ(main.MyElement.size(), 1);
+    }
+    {
+        Occurrence::Main main;
+        Occurrence::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main><MyElement name="name1"/><MyElement name="name2"/><MyElement name="name3"/></Main>)", main);
+        EXPECT_EQ(main.MyElement.size(), 3);
+    }
+    {
+        try
+        {
+            Occurrence::Main main;
+            Occurrence::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+        <Main></Main>)", main);
+            EXPECT_EQ(main.MyElement.size(), 1);
+        }
+        catch(const std::exception& e)
+        {
+            EXPECT_EQ(std::string(e.what()), "Error at line '2': Minimum occurrence of element 'MyElement' is 1");
+        }
+    }
+    {
+        try
+        {
+            Occurrence::Main main;
+            Occurrence::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+    <Main><MyElement name="name1"/><MyElement name="name2"/><MyElement name="name3"/><MyElement name="name4"/></Main>)", main);
+            EXPECT_EQ(main.MyElement.size(), 1);
+        }
+        catch(const std::exception& e)
+        {
+            std::string xx(e.what());
+            EXPECT_EQ(std::string(e.what()), "Error at line '2': Maximum occurrence of element 'MyElement' is 3");
+        }
+    }
+
+}
 
 // todo:
 
 // Int Attribute out of range
 // Invalid Enum Attribute
 // Attribute not matching pattern
-// Too Many Elements
-// Missing Element

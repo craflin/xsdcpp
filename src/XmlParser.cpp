@@ -401,7 +401,7 @@ void enterElement(Context& context, xsdcpp::ElementContext& parentElementContext
 
 void checkElement(Context& context, const xsdcpp::ElementContext& elementContext)
 {
-    if (elementContext.info->mandatoryChildrenCount)
+    if (elementContext.info->flags & xsdcpp::ElementInfo::CheckChildrenFlag)
         for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
             if (const xsdcpp::ChildElementInfo* c = i->children)
                 for (; c->name; ++c)

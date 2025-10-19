@@ -29,23 +29,25 @@ Since XSD is bloated with weirdness and features, its very hard to support all o
 So, XSDCPP does just support what was thrown at it so far and there are probably some severe limitations.
 
 Notable supported features:
-* `include`,
-* `import` with namespaces (however, element names in a resulting data model should be unique since the resulting parser will ignore namespaces),
 * elements mapped to a C++ struct,
-* basic attribute data types that are mapped to a `std::string`, an integer type, a floating point type, or a generated C++ enum class,
 * optional elements and lists of elements,
+* elements derived from a simple type,
+* basic attribute data types that are mapped to a `std::string`, an integer type, a floating point type, or a generated C++ enum class,
+* attributes with list types,
 * default attribute values,
 * attribute presence validation,
-* substitution groups,
-* lax and skip content processing,
 * optional attributes,
 * any attributes,
-* Unicode escape sequence handling.
+* substitution groups,
+* lax and skip content processing,
+* Unicode escape sequence handling,
+* `include`,
+* `import` with namespaces (however, element names in a resulting data model should be unique since the resulting parser will ignore namespaces).
 
 Known missing feature are:
-* proper element occurrence validation,
-* attribute regex validation,
-* correct processing of namespaced element or attribute names,
+* proper element occurrence validation for choice and substitution groups,
+* attribute regex or value range validation,
+* consideration of names for processing element or attribute names,
 * proper support for union types.
 
 Intentionally not supported features:

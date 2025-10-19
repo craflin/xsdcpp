@@ -41,13 +41,13 @@ struct ElementInfo
         ReadTextFlag = 0x02,
         SkipProcessingFlag = 0x04,
         AnyAttributeFlag = 0x08,
+        CheckChildrenFlag = 0x10,
     };
     
     size_t flags;
     set_value_t addText;
     const ChildElementInfo* children;
     size_t childrenCount;
-    size_t mandatoryChildrenCount;
     const AttributeInfo* attributes;
     uint64_t checkAttributeMask;
     const ElementInfo* base;

@@ -1172,6 +1172,8 @@ private:
                 flags.append("xsdcpp::ElementInfo::EntryPointFlag");
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 flags.append("xsdcpp::ElementInfo::AnyAttributeFlag");
+            if (mandatoryChildrenCount)
+                flags.append("xsdcpp::ElementInfo::CheckChildrenFlag");
 
             String addTextFunction;
             if (!generateAddTextFunction2(typeName, flags, addTextFunction))
@@ -1187,7 +1189,7 @@ private:
 
             _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
                 + ", " + addTextFunction
-                + ", " + children + ", " + String::fromUInt64(childrenCount) + ", " + String::fromUInt64(mandatoryChildrenCount) 
+                + ", " + children + ", " + String::fromUInt64(childrenCount)
                 + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) 
                 + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
