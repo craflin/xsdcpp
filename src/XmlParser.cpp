@@ -2,7 +2,6 @@
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
-#include <list>
 
 namespace xsdcpp {
 
@@ -41,7 +40,7 @@ struct Context
     xsdcpp::Position pos;
     Token token;
     const char** namespaces;
-    std::unordered_map<std::string, size_t> namespacePrefixToIndex;
+    std::string xmlSchemaNamespacePrefix;
 };
 
 void skipSpace(xsdcpp::Position& pos)
@@ -384,7 +383,7 @@ void enterElement(Context& context, xsdcpp::ElementContext& parentElementContext
             for (; c->name; ++c)
                 if (*name == c->name)
                 {
-                    size_t& count = parentElementContext.processedElements[c];
+                    size_t& count = parentElementContext.processedElements2[c->trackIndex];
                     if (c->maxOccurs && count >= c->maxOccurs)
                     {
                         std::stringstream s;
@@ -394,7 +393,7 @@ void enterElement(Context& context, xsdcpp::ElementContext& parentElementContext
                     ++count;
                     elementContext.element = c->getElementField(parentElementContext.element);
                     elementContext.info = c->info;
-                    elementContext.processedElements.reserve(c->info->childrenCount);
+                    memset(elementContext.processedElements2, 0, sizeof(size_t) * c->info->childrenCount);
                     return;
                 }
     throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
@@ -406,16 +405,12 @@ void checkElement(Context& context, const xsdcpp::ElementContext& elementContext
         for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
             if (const xsdcpp::ChildElementInfo* c = i->children)
                 for (; c->name; ++c)
-                {
-                    std::unordered_map<const xsdcpp::ChildElementInfo*, size_t>::const_iterator it = elementContext.processedElements.find(c);
-                    size_t count = it == elementContext.processedElements.end() ? 0 : it->second;
-                    if (count < c->minOccurs)
+                    if (elementContext.processedElements2[c->trackIndex] < c->minOccurs)
                     {
                         std::stringstream s;
-                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs ;
+                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs;
                         throwVerificationException(context.pos, s.str());
                     }
-                }
 }
 
 void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std::string&& name, std::string&& value)
@@ -443,7 +438,8 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
             for (const char** ns = context.namespaces; *ns; ++ns, ++namespaceIndex)
                 if (value == *ns)
                 {
-                    context.namespacePrefixToIndex.insert(std::pair<std::string, size_t>(namespacePrefix, namespaceIndex));
+                    if (value == "http://www.w3.org/2001/XMLSchema-instance")
+                        context.xmlSchemaNamespacePrefix = std::move(namespacePrefix);
                     return;
                 }
             throwVerificationException(context.pos, "Unknown namespace '" + value + "'");
@@ -451,8 +447,8 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
         size_t n = name.find(':');
         if (n != std::string::npos && name.compare(n + 1, std::string::npos, "noNamespaceSchemaLocation") == 0)
         {
-            std::unordered_map<std::string, size_t>::const_iterator it = context.namespacePrefixToIndex.find(name.substr(0, n));
-            if (it != context.namespacePrefixToIndex.end() && strcmp(context.namespaces[it->second], "http://www.w3.org/2001/XMLSchema-instance") == 0)
+            std::string namespacePrefix = name.substr(0, n);
+            if (namespacePrefix == context.xmlSchemaNamespacePrefix)
                 return;
         }
     }

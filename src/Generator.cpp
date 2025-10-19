@@ -98,6 +98,7 @@ public:
         _cppOutputFinal.append("");
         _cppOutputFinal.append("#include <fstream>");
         _cppOutputFinal.append("#include <sstream>");
+        _cppOutputFinal.append("#include <cstring>");
         _cppOutputFinal.append("");
 
 
@@ -186,12 +187,6 @@ public:
 
         _hppOutput.append("}");
 
-        //_cppOutput.append("");
-        //_cppOutput.append("#include <fstream>");
-        //_cppOutput.append("#include <system_error>");
-        //_cppOutput.append("#include <sstream>");
-        //_cppOutput.append("");
-
         _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputNamespaceElementInfoExtern);
@@ -233,10 +228,11 @@ public:
 
             _cppOutputFinal.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
             _cppOutputFinal.append("{");
-            _cppOutputFinal.append(String("    ") + rootTypeCppName + " rootElement;");
             _cppOutputFinal.append("    xsdcpp::ElementContext elementContext;");
+            _cppOutputFinal.append(String("    ") + rootTypeCppName + " rootElement;");
             _cppOutputFinal.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
             _cppOutputFinal.append("    elementContext.element = &rootElement;");
+            _cppOutputFinal.append(String("    memset(elementContext.processedElements2, 0, sizeof(size_t) * _") + rootTypeCppName + "_Info.childrenCount);");
             _cppOutputFinal.append("    xsdcpp::parse(data.c_str(), _namespaces, elementContext);");
             _cppOutputFinal.append(String("    output = std::move(rootElement.") + elementCppName + ");");
             _cppOutputFinal.append("}");
@@ -954,11 +950,15 @@ private:
             String cppNameWithNamespace = toCppTypeIdentifierWithNamespace2(typeName);
 
             Xsd::Type* baseType = nullptr;
+            usize nextChildElementTrackIndex = 0;
+            usize nextAttributeTrackIndex = 0;
             if (!type.baseType.name.isEmpty())
             {
                 if (!processType2(type.baseType, level + 1, true))
                     return false;
                 baseType = &*_xsd.types.find(type.baseType);
+                nextChildElementTrackIndex = getChildrenCount(type.baseType);
+                nextAttributeTrackIndex = getAttributesCount(type.baseType);
             }
 
             List<String> structFields;
@@ -1056,6 +1056,8 @@ private:
                     if (!processType2(elementRef.typeName, level + 1, false))
                         return false;
 
+                    usize trackIndex = nextChildElementTrackIndex++;
+
                     const Xsd::Type& type = *_xsd.types.find(elementRef.typeName);
                     if (type.kind == Xsd::Type::SubstitutionGroupKind)
                     {
@@ -1068,7 +1070,7 @@ private:
                             if (!generateElementInfo(subElementRef.typeName))
                                 return false;
 
-                            childElementInfo.append(String("    {\"") + subElementRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName +  "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + ", &" + toCppNamespacePrefix(subElementRef.typeName) + "::_" + toCppTypeIdentifier2(subElementRef.typeName) + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                            childElementInfo.append(String("    {\"") + subElementRef.name.name + "\", " + String::fromUInt((uint)trackIndex) + ", (xsdcpp::get_field_t)&_get_" + cppName +  "_" + toCppFieldIdentifier(elementRef.name) + "_" + toCppFieldIdentifier(subElementRef.name) + ", &" + toCppNamespacePrefix(subElementRef.typeName) + "::_" + toCppTypeIdentifier2(subElementRef.typeName) + "_Info, 0, " + String::fromUInt(elementRef.maxOccurs)  + "},");
                         }
                     }
                     else
@@ -1076,7 +1078,7 @@ private:
                         if (!generateElementInfo(elementRef.typeName))
                             return false;
 
-                        childElementInfo.append(String("    {\"") + elementRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(elementRef.name) + ", &" + toCppNamespacePrefix(elementRef.typeName) + "::_" + toCppTypeIdentifier2(elementRef.typeName) + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
+                        childElementInfo.append(String("    {\"") + elementRef.name.name + "\", " + String::fromUInt((uint)trackIndex) + ", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(elementRef.name) + ", &" + toCppNamespacePrefix(elementRef.typeName) + "::_" + toCppTypeIdentifier2(elementRef.typeName) + "_Info, " + String::fromUInt(elementRef.minOccurs)  + ", " + String::fromUInt(elementRef.maxOccurs)  + "},");
                     }
                 }
                 childElementInfo.append("    {nullptr}\n};");
@@ -1129,10 +1131,13 @@ private:
                     const Xsd::AttributeRef& attributeRef = *i;
                     if (!processType2(attributeRef.typeName, level + 1, false))
                         return false;
+
+                    usize trackIndex = nextAttributeTrackIndex++;
+
                     String setDefault("nullptr");
                     if (setDefaultValueFunctions.contains(&attributeRef))
                         setDefault = String("(xsdcpp::set_default_t)&_default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
-                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", " + String::fromUInt((uint)trackIndex) + ", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
                 _cppOutputAnonymousFieldGetter.append("    {nullptr}\n};");
             }

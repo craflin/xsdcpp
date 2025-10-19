@@ -1,7 +1,6 @@
 
 #include <string>
 #include <cstdint>
-#include <unordered_map>
 
 namespace xsdcpp {
 
@@ -17,6 +16,7 @@ typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& val
 struct ChildElementInfo
 {
     const char* name;
+    size_t trackIndex;
     get_field_t getElementField;
     const ElementInfo* info;
     size_t minOccurs;
@@ -26,6 +26,7 @@ struct ChildElementInfo
 struct AttributeInfo
 {
     const char* name;
+    size_t trackIndex;
     get_field_t getAttribute;
     set_value_t setValue;
     bool isMandatory;
@@ -57,7 +58,7 @@ struct ElementContext
 {
     const ElementInfo* info;
     void* element;
-    std::unordered_map<const ChildElementInfo*, size_t> processedElements;
+    size_t processedElements2[64];
     uint64_t processedAttributes;
 
     ElementContext() : processedAttributes(0) {}
@@ -79,6 +80,5 @@ void set_int16_t(int16_t* obj, const Position& pos, std::string&& val);
 void set_float(float* obj, const Position& pos, std::string&& val);
 void set_double(double* obj, const Position& pos, std::string&& val);
 void set_bool(bool* obj, const Position& pos, std::string&& val);
-
 
 }
