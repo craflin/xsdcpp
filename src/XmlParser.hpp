@@ -61,7 +61,7 @@ struct ElementContext
     size_t processedElements2[64];
     uint64_t processedAttributes2;
 
-    ElementContext() : processedAttributes2(0) {}
+    ElementContext(const ElementInfo* info, void* element);
 };
 
 void parse(const char* data, const char** namespaces, ElementContext& elementContext);

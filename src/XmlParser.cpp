@@ -5,6 +5,14 @@
 
 namespace xsdcpp {
 
+ElementContext::ElementContext(const ElementInfo* info, void* element)
+    : info(info)
+    , element(element)
+    , processedAttributes2(0)
+{
+    memset(processedElements2, 0, sizeof(size_t) * info->childrenCount);
+}
+
 struct Position
 {
     int line;
@@ -368,35 +376,38 @@ void skipTextAndSubElements(Context& context, const std::string& elementName)
     }
 }
 
-void enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const std::string& name_, xsdcpp::ElementContext& elementContext)
+xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const xsdcpp::ChildElementInfo& childInfo)
 {
-    std::string nameWithoutNamespace;
-    const std::string* name = &name_;
-    size_t n = name_.find(':');
-    if (n != std::string::npos)
+    size_t& count = parentElementContext.processedElements2[childInfo.trackIndex];
+    if (childInfo.maxOccurs && count >= childInfo.maxOccurs)
     {
-        nameWithoutNamespace = name_.substr(n + 1);
-        name = &nameWithoutNamespace;
+        std::stringstream s;
+        s << "Maximum occurrence of element '" << childInfo.name << "' is " << childInfo.maxOccurs ;
+        throwVerificationException(context.pos,  s.str());
     }
+    ++count;
+    return xsdcpp::ElementContext(childInfo.info, childInfo.getElementField(parentElementContext.element));
+}
+
+xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const std::string& name)
+{
     for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
         if (const xsdcpp::ChildElementInfo* c = i->children)
             for (; c->name; ++c)
-                if (*name == c->name)
-                {
-                    size_t& count = parentElementContext.processedElements2[c->trackIndex];
-                    if (c->maxOccurs && count >= c->maxOccurs)
-                    {
-                        std::stringstream s;
-                        s << "Maximum occurrence of element '" << *name << "' is " << c->maxOccurs ;
-                        throwVerificationException(context.pos,  s.str());
-                    }
-                    ++count;
-                    elementContext.element = c->getElementField(parentElementContext.element);
-                    elementContext.info = c->info;
-                    memset(elementContext.processedElements2, 0, sizeof(size_t) * c->info->childrenCount);
-                    return;
-                }
-    throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
+                if (name == c->name)
+                    return enterElement(context, parentElementContext, *c);
+    size_t n = name.find(':');
+    if (n != std::string::npos)
+    {
+        std::string nameWithoutNamespace = name.substr(n + 1);
+        for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+            if (const xsdcpp::ChildElementInfo* c = i->children)
+                for (; c->name; ++c)
+                    if (nameWithoutNamespace == c->name)
+                        return enterElement(context, parentElementContext, *c);
+    }
+    throwVerificationException(context.pos, "Unexpected element '" + name + "'");
+    return xsdcpp::ElementContext(nullptr, nullptr);
 }
 
 void checkElement(Context& context, const xsdcpp::ElementContext& elementContext)
@@ -484,8 +495,7 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
     if (context.token.type != Token::nameType)
         throwSyntaxException(context.token.pos, "Expected tag name");
     std::string elementName = std::move(context.token.value);
-    xsdcpp::ElementContext elementContext;
-    enterElement(context, parentElementContext, elementName, elementContext);
+    xsdcpp::ElementContext elementContext = enterElement(context, parentElementContext, elementName);
     for (;;)
     {
         readToken(context);

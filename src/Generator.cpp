@@ -98,7 +98,6 @@ public:
         _cppOutputFinal.append("");
         _cppOutputFinal.append("#include <fstream>");
         _cppOutputFinal.append("#include <sstream>");
-        _cppOutputFinal.append("#include <cstring>");
         _cppOutputFinal.append("");
 
 
@@ -228,11 +227,8 @@ public:
 
             _cppOutputFinal.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
             _cppOutputFinal.append("{");
-            _cppOutputFinal.append("    xsdcpp::ElementContext elementContext;");
             _cppOutputFinal.append(String("    ") + rootTypeCppName + " rootElement;");
-            _cppOutputFinal.append(String("    elementContext.info = &_") + rootTypeCppName + "_Info;");
-            _cppOutputFinal.append("    elementContext.element = &rootElement;");
-            _cppOutputFinal.append(String("    memset(elementContext.processedElements2, 0, sizeof(size_t) * _") + rootTypeCppName + "_Info.childrenCount);");
+            _cppOutputFinal.append(String("    xsdcpp::ElementContext elementContext(&_") + rootTypeCppName + "_Info, &rootElement);");
             _cppOutputFinal.append("    xsdcpp::parse(data.c_str(), _namespaces, elementContext);");
             _cppOutputFinal.append(String("    output = std::move(rootElement.") + elementCppName + ");");
             _cppOutputFinal.append("}");
