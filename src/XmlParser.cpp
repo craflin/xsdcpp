@@ -415,15 +415,15 @@ void checkElement(Context& context, const xsdcpp::ElementContext& elementContext
 
 void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std::string&& name, std::string&& value)
 {
-    uint64_t attribute = 1;
     for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
         if (const xsdcpp::AttributeInfo* a = i->attributes)
-            for (; a->name; ++a, attribute <<= 1)
+            for (; a->name; ++a)
                 if (name == a->name)
                 {
-                    if (elementContext.processedAttributes & attribute)
+                    uint64_t attributeBit = 1 << a->trackIndex;
+                    if (elementContext.processedAttributes2 & attributeBit)
                         throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
-                    elementContext.processedAttributes |= attribute;
+                    elementContext.processedAttributes2 |= attributeBit;
                     a->setValue(a->getAttribute(elementContext.element), context.pos, std::move(value));
                     return;
                 }
@@ -465,14 +465,13 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
 void checkAttributes(Context& context, xsdcpp::ElementContext& elementContext)
 {
     uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
-    uint64_t missingAttributes = attributes & ~elementContext.processedAttributes;
+    uint64_t missingAttributes = attributes & ~elementContext.processedAttributes2;
     if (missingAttributes)
     {
-        uint64_t attribute = 1;
         for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
             if (const xsdcpp::AttributeInfo* a = i->attributes)
-                for (; a->name; ++a, attribute <<= 1)
-                    if (missingAttributes & attribute)
+                for (; a->name; ++a)
+                    if (missingAttributes & (1 << a->trackIndex))
                     {
                         if (a->isMandatory)
                             throwVerificationException(context.pos, "Missing attribute '" + std::string(a->name) + "'");

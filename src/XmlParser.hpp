@@ -59,9 +59,9 @@ struct ElementContext
     const ElementInfo* info;
     void* element;
     size_t processedElements2[64];
-    uint64_t processedAttributes;
+    uint64_t processedAttributes2;
 
-    ElementContext() : processedAttributes(0) {}
+    ElementContext() : processedAttributes2(0) {}
 };
 
 void parse(const char* data, const char** namespaces, ElementContext& elementContext);
