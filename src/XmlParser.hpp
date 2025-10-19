@@ -81,4 +81,6 @@ void set_float(float* obj, const Position& pos, std::string&& val);
 void set_double(double* obj, const Position& pos, std::string&& val);
 void set_bool(bool* obj, const Position& pos, std::string&& val);
 
+std::string read_file(const std::string& filePath);
+
 }

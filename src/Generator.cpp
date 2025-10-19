@@ -96,10 +96,6 @@ public:
         _cppOutputFinal.append("");
         _cppOutputFinal.append(String("#include \"") + _cppNamespace + ".hpp\"");
         _cppOutputFinal.append("");
-        _cppOutputFinal.append("#include <fstream>");
-        _cppOutputFinal.append("#include <sstream>");
-        _cppOutputFinal.append("");
-
 
         for (HashMap<String, HashSet<Xsd::Name>>::Iterator i = externalTypes.begin(), end = externalTypes.end(); i != end; ++i)
         {
@@ -236,12 +232,7 @@ public:
 
             _cppOutputFinal.append(String("void load_file(const std::string& filePath, ") + elementTypeCppName + "& output)");
             _cppOutputFinal.append("{");
-            _cppOutputFinal.append("    std::fstream file;");
-            _cppOutputFinal.append("    file.exceptions(std::fstream::failbit | std::fstream::badbit);");
-            _cppOutputFinal.append("    file.open(filePath, std::fstream::in);");
-            _cppOutputFinal.append("    std::stringstream buffer;");
-            _cppOutputFinal.append("    buffer << file.rdbuf();");
-            _cppOutputFinal.append("    load_data(buffer.str(), output);");
+            _cppOutputFinal.append("    load_data(xsdcpp::read_file(filePath), output);");
             _cppOutputFinal.append("}");
             _cppOutputFinal.append("");
         }

@@ -1,6 +1,7 @@
 
 #include <cstring>
 #include <sstream>
+#include <fstream>
 #include <stdexcept>
 
 namespace xsdcpp {
@@ -637,5 +638,15 @@ void set_int16_t(int16_t* obj,  const Position& pos, std::string&& val) { std::s
 void set_float(float* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected single precision floating point value"); }
 void set_double(double* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected double precision floating point value"); }
 void set_bool(bool* obj, const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> std::boolalpha >> *obj)) throwVerificationException(pos, "Expected boolean value"); }
+
+std::string read_file(const std::string& filePath)
+{
+    std::fstream file;
+    file.exceptions(std::fstream::failbit | std::fstream::badbit);
+    file.open(filePath, std::fstream::in);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
 
 }
