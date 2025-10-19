@@ -49,7 +49,6 @@ struct Context
     xsdcpp::Position pos;
     Token token;
     const char** namespaces;
-    std::string xmlSchemaNamespacePrefix;
 };
 
 void skipSpace(xsdcpp::Position& pos)
@@ -448,19 +447,16 @@ void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std:
             size_t namespaceIndex = 0;
             for (const char** ns = context.namespaces; *ns; ++ns, ++namespaceIndex)
                 if (value == *ns)
-                {
-                    if (value == "http://www.w3.org/2001/XMLSchema-instance")
-                        context.xmlSchemaNamespacePrefix = std::move(namespacePrefix);
                     return;
-                }
             throwVerificationException(context.pos, "Unknown namespace '" + value + "'");
         }
         size_t n = name.find(':');
-        if (n != std::string::npos && name.compare(n + 1, std::string::npos, "noNamespaceSchemaLocation") == 0)
+        if (n != std::string::npos)
         {
-            std::string namespacePrefix = name.substr(0, n);
-            if (namespacePrefix == context.xmlSchemaNamespacePrefix)
-                return;
+            ++n;
+             if (name.compare(n, std::string::npos, "noNamespaceSchemaLocation") == 0 ||
+                 name.compare(n, std::string::npos, "schemaLocation") == 0)
+                 return;
         }
     }
     for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
