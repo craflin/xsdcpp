@@ -1145,7 +1145,7 @@ private:
                     String setDefault("nullptr");
                     if (_generatedAttributeSetDefaultValueFunctions.contains(&attributeRef))
                         setDefault = String("(xsdcpp::set_default_t)&_default_") + cppName + "_" + toCppFieldIdentifier(attributeRef.name);
-                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", " + String::fromUInt64(trackBit) + ", (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
+                    _cppOutputAnonymousFieldGetter.append(String("    {\"") + attributeRef.name.name + "\", " + String::fromUInt64(trackBit) + "ULL, (xsdcpp::get_field_t)&_get_" + cppName + "_" + toCppFieldIdentifier(attributeRef.name) + ", (xsdcpp::set_value_t)&" + toSetValueFunctionName(attributeRef.typeName) + ", " + (attributeRef.isMandatory ? String("true") : String("false")) +  ", " + setDefault + "},");
                 }
                 _cppOutputAnonymousFieldGetter.append("    {nullptr}\n};");
             }
@@ -1177,7 +1177,7 @@ private:
             _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount)
-                + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) 
+                + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) + "ULL"
                 + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
                 + " };");
