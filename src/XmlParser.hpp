@@ -70,6 +70,8 @@ bool getListItem(const char*& s, std::string& result);
 
 uint32_t toNumeric(const Position& pos, const char* const* values, const std::string& value);
 
+std::string to_string(size_t val, size_t size, const char* const* values, const char* name);
+
 void set_string(std::string* obj,const Position&, std::string&& val);
 void set_uint64_t(uint64_t* obj, const Position& pos, std::string&& val);
 void set_int64_t(int64_t* obj, const Position& pos, std::string&& val);

@@ -624,6 +624,13 @@ uint32_t toNumeric(const Position& pos, const char* const* values, const std::st
     return 0;
 }
 
+std::string to_string(size_t val, size_t size, const char* const* values, const char* name)
+{
+    if (val >= size)
+        throw std::invalid_argument("Invalid " + std::string(name) + " argument");
+    return values[val];
+}
+
 void set_string(std::string* obj, const Position&, std::string&& val) { if (obj->empty()) *obj = std::move(val); else *obj += val; }
 void set_uint64_t(uint64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected unsigned 64-bit integer value"); }
 void set_int64_t(int64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throwVerificationException(pos, "Expected 64-bit integer value"); }

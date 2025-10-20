@@ -10,6 +10,16 @@
 
 #include <gtest/gtest.h>
 
+TEST(Features, Enums)
+{
+    EXPECT_EQ(SimpleTypeExtension::XEnumZZ::A, (SimpleTypeExtension::XEnumZZ)0);
+    EXPECT_EQ(SimpleTypeExtension::XEnumZZ::B, (SimpleTypeExtension::XEnumZZ)1);
+    EXPECT_EQ(SimpleTypeExtension::XEnumZZ::C, (SimpleTypeExtension::XEnumZZ)2);
+    EXPECT_EQ(to_string(SimpleTypeExtension::XEnumZZ::A), "A");
+    EXPECT_EQ(to_string(SimpleTypeExtension::XEnumZZ::B), "B");
+    EXPECT_EQ(to_string(SimpleTypeExtension::XEnumZZ::C), "C");
+}
+
 TEST(Features, SubstitutionGroup)
 {
     SubstitutionGroup::Main main;

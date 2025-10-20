@@ -590,7 +590,28 @@ private:
                 const Xsd::Name& elementTypeName = i->typeName;
                 String namespacePrefix;
                 if (isNamespaceExternal(elementTypeName.xsdNamespace, namespacePrefix))
-                    externalTypes.append(namespacePrefix, HashSet<Xsd::Name>(), false).append(elementTypeName);
+                {
+                    HashSet<Xsd::Name>& exernalTypesOfNamespace =  externalTypes.append(namespacePrefix, HashSet<Xsd::Name>(), false);
+                    if (!exernalTypesOfNamespace.contains(elementTypeName))
+                    {
+                        exernalTypesOfNamespace.append(elementTypeName);
+
+                        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(elementTypeName);
+                        if (it == _xsd.types.end())
+                            return _error = String::fromPrintf("Type '%s' not found", (const char*)typeName.name), false;
+                        Xsd::Type& type = *it;
+                        if (type.kind == Xsd::Type::SubstitutionGroupKind)
+                        {
+                            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+                            {
+                                const Xsd::Name& elementTypeName = i->typeName;
+                                String namespacePrefix;
+                                if (isNamespaceExternal(elementTypeName.xsdNamespace, namespacePrefix))
+                                    externalTypes.append(namespacePrefix, HashSet<Xsd::Name>(), false).append(elementTypeName);
+                            }
+                        }
+                    }
+                }
             }
 
             for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
@@ -719,12 +740,6 @@ private:
         }
         else if (type.kind == Xsd::Type::Kind::EnumKind)
         {
-            _cppOutputAnonymousEnumValues.append(String("const char* _") + cppName + "_Values[] = {");
-            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-                _cppOutputAnonymousEnumValues.append(String("    \"") + *i + "\",");
-            _cppOutputAnonymousEnumValues.append("    nullptr};");
-            _cppOutputAnonymousEnumValues.append("");
-
             _cppOutputNamespaceSetValue.append(String("void ") + functionName + "(" + cppNameWithNamespace + "* obj, const xsdcpp::Position& pos, std::string&& val) { *obj = (" + cppNameWithNamespace + ")xsdcpp::toNumeric(pos, _" + cppName + "_Values, val); }");
         }
         else
@@ -920,6 +935,15 @@ private:
                 _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
             _hppOutput.append("};");
             _hppOutput.append("");
+            _hppOutput.append(String("std::string to_string(") + cppName + ");");
+            _hppOutput.append("");
+
+            _cppOutputAnonymousEnumValues.append(String("const char* _") + cppName + "_Values[] = {");
+            for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
+                _cppOutputAnonymousEnumValues.append(String("    \"") + *i + "\",");
+            _cppOutputAnonymousEnumValues.append("    nullptr};");
+            _cppOutputAnonymousEnumValues.append("");
+            _cppOutputNamespaceSetValue.append(String("std::string to_string(") + cppName + " val) { return xsdcpp::to_string((size_t)val, " + String::fromUInt64(type.enumEntries.size()) +  ", _" + cppName + "_Values, " + toCStringLiteral(cppName) + "); }");
 
             return true;
         }
