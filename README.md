@@ -41,14 +41,14 @@ Notable supported features:
 * substitution groups,
 * lax and skip content processing,
 * Unicode escape sequence handling,
-* `include`,
+* `include` processing,
 * `import` with namespaces (however, element names in a resulting data model should be unique since the resulting parser will ignore namespaces).
 
 Known missing feature are:
 * proper element occurrence validation for choice and substitution groups,
 * attribute regex or value range validation,
-* consideration of names for processing element or attribute names,
-* proper support for union types.
+* consideration of namespaces for processing element or attribute names,
+* proper support for union types (they are currently mapped to `std::string`).
 
 Intentionally not supported features:
 * codecs other than UTF-8,
