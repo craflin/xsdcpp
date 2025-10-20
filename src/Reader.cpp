@@ -296,9 +296,7 @@ private:
     static bool isXsStringBaseType(const Xsd::Name& typeName)
     {
         if (typeName.xsdNamespace == "http://www.w3.org/2001/XMLSchema")
-            return typeName.name == "normalizedString" || typeName.name == "string" || 
-            typeName.name == "anySimpleType" || typeName.name == "anyURI" || typeName.name == "NCName" || typeName.name == "QName" ||
-            typeName.name == "dateTime" || typeName.name == "base64Binary";
+            return !isXsNumericBaseType(typeName);
         else if(typeName.xsdNamespace == "http://www.w3.org/XML/1998/namespace")
             return typeName.name == "lang";
         return false;
