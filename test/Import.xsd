@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:local_ext="http://whatever.x/local_ext" xmlns:SimpleTypeExtension="http://whatever.x/local" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/local_ext">
+
+    <xsd:import namespace="http://whatever.x/local" schemaLocation="SimpleTypeExtension.xsd"/>
+
+    <xsd:element name="Main1" type="local_ext:MainType1" />
+
+    <xsd:complexType name="MainType1">
+        <xsd:complexContent>
+            <xsd:extension base="SimpleTypeExtension:MainEnum">
+                <xsd:sequence>
+                    <xsd:element name="MainInt" type="SimpleTypeExtension:MainInt"/>
+                    <xsd:element name="Version" type="SimpleTypeExtension:Version"/>
+                </xsd:sequence>
+                <xsd:attribute name="myList" type="SimpleTypeExtension:MyList" use="required"/>
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+</xsd:schema>
+
+

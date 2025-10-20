@@ -1,69 +1,18 @@
 
 #include <cstring>
 #include <sstream>
+#include <fstream>
 #include <stdexcept>
-#include <string>
-#include <cstdint>
-#include <unordered_map>
 
-namespace {
+namespace xsdcpp {
 
-struct Context;
-struct ElementContext;
-struct Position;
-struct ElementInfo;
-
-typedef void* (*get_element_field_t)(void*);
-typedef void (*set_attribute_t)(void*, const Position&, std::string&& value);
-typedef void (*set_attribute_default_t)(void*);
-typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
-
-struct ChildElementInfo
+ElementContext::ElementContext(const ElementInfo* info, void* element)
+    : info(info)
+    , element(element)
+    , processedAttributes2(0)
 {
-    const char* name;
-    get_element_field_t getElementField;
-    const ElementInfo* info;
-    size_t minOccurs;
-    size_t maxOccurs;
-};
-
-struct AttributeInfo
-{
-    const char* name;
-    set_attribute_t setAttribute;
-    bool isMandatory;
-    set_attribute_default_t setDefaultValue;
-};
-
-struct ElementInfo
-{
-    enum ElementFlag
-    {
-        Level1Flag = 0x01,
-        ReadTextFlag = 0x02,
-        SkipProcessingFlag = 0x04,
-        AnyAttributeFlag = 0x08,
-    };
-    
-    size_t flags;
-    const ChildElementInfo* children;
-    size_t childrenCount;
-    size_t mandatoryChildrenCount;
-    const AttributeInfo* attributes;
-    size_t attributesCount;
-    const ElementInfo* base;
-    set_any_attribute_t setOtherAttribute;
-};
-
-struct ElementContext
-{
-    const ElementInfo* info;
-    void* element;
-    std::unordered_map<const ChildElementInfo*, size_t> processedElements;
-    uint64_t processedAttributes;
-
-    ElementContext() : processedAttributes(0) {}
-};
+    memset(processedElements2, 0, sizeof(size_t) * info->childrenCount);
+}
 
 struct Position
 {
@@ -71,6 +20,11 @@ struct Position
     const char* pos;
     const char* lineStart;
 };
+
+}
+
+
+namespace {
 
 struct Token
 {
@@ -87,18 +41,17 @@ struct Token
 
     Type type;
     std::string value;
-    Position pos;
+    xsdcpp::Position pos;
 };
 
 struct Context
 {
-    Position pos;
+    xsdcpp::Position pos;
     Token token;
     const char** namespaces;
-    std::unordered_map<std::string, size_t> namespacePrefixToIndex;
 };
 
-void skipSpace(Position& pos)
+void skipSpace(xsdcpp::Position& pos)
 {
     for (char c;;)
         switch ((c = *pos.pos))
@@ -165,21 +118,21 @@ void skipSpace(Position& pos)
         }
 }
 
-void throwSyntaxException(const Position& pos, const std::string& error)
+std::runtime_error SyntaxException(const xsdcpp::Position& pos, const std::string& error)
 {
     std::stringstream s;
     s << "Syntax error at line '" << pos.line << "': " << error;
-    throw std::runtime_error(s.str());
+    return std::runtime_error(s.str());
 }
 
-void throwVerificationException(const Position& pos, const std::string& error)
+std::runtime_error VerificationException(const xsdcpp::Position& pos, const std::string& error)
 {
     std::stringstream s;
     s << "Error at line '" << pos.line << "': " << error;
-    throw std::runtime_error(s.str());
+    return std::runtime_error(s.str());
 }
 
-void skipText(Position& pos)
+void skipText(xsdcpp::Position& pos)
 {
     for (;;)
     {
@@ -187,7 +140,7 @@ void skipText(Position& pos)
         if (!end)
         {
             pos.pos = pos.pos + strlen(pos.pos);
-            throwSyntaxException(pos, "Unexpected end of file");
+            throw SyntaxException(pos, "Unexpected end of file");
         }
         pos.pos = end;
         switch (*pos.pos)
@@ -349,7 +302,7 @@ void readToken(Context& context)
         ++context.pos.pos;
         return;
     case '\0':
-        throwSyntaxException(context.pos, "Unexpected end of file");
+        throw SyntaxException(context.pos, "Unexpected end of file");
     case '=':
         context.token.type = Token::equalsSignType;
         ++context.pos.pos;
@@ -360,9 +313,9 @@ void readToken(Context& context)
         *endChars = *context.pos.pos;
         const char* end = strpbrk(context.pos.pos + 1, endChars);
         if (!end)
-            throwSyntaxException(context.pos, "Unexpected end of file");
+            throw SyntaxException(context.pos, "Unexpected end of file");
         if (*end != *context.pos.pos)
-            throwSyntaxException(context.pos, "New line in string");
+            throw SyntaxException(context.pos, "New line in string");
         context.token.value = unescapeString(context.pos.pos + 1, end - context.pos.pos - 1);
         context.token.type = Token::stringType;
         context.pos.pos = end + 1;
@@ -382,7 +335,7 @@ void readToken(Context& context)
             while (*end && *end != '/' && *end != '>' && *end != '=' && !isspace(*end))
                 ++end;
             if (end == context.pos.pos)
-                throwSyntaxException(context.pos, "Expected name");
+                throw SyntaxException(context.pos, "Expected name");
             context.token.value = std::string(context.pos.pos, end - context.pos.pos);
             context.token.type = Token::nameType;
             context.pos.pos = end;
@@ -396,7 +349,7 @@ void skipTextAndSubElements(Context& context, const std::string& elementName)
     for (;;)
     {
         skipText(context.pos);
-        Position posBackup = context.pos;
+        xsdcpp::Position posBackup = context.pos;
         readToken(context);
         switch (context.token.type)
         {
@@ -423,70 +376,67 @@ void skipTextAndSubElements(Context& context, const std::string& elementName)
     }
 }
 
-void enterElement(Context& context, ElementContext& parentElementContext, const std::string& name_, ElementContext& elementContext)
+xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const xsdcpp::ChildElementInfo& childInfo)
 {
-    std::string nameWithoutNamespace;
-    const std::string* name = &name_;
-    size_t n = name_.find(':');
+    size_t& count = parentElementContext.processedElements2[childInfo.trackIndex];
+    if (childInfo.maxOccurs && count >= childInfo.maxOccurs)
+    {
+        std::stringstream s;
+        s << "Maximum occurrence of element '" << childInfo.name << "' is " << childInfo.maxOccurs ;
+        throw VerificationException(context.pos,  s.str());
+    }
+    ++count;
+    return xsdcpp::ElementContext(childInfo.info, childInfo.getElementField(parentElementContext.element));
+}
+
+xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& parentElementContext, const std::string& name)
+{
+    for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+        if (const xsdcpp::ChildElementInfo* c = i->children)
+            for (; c->name; ++c)
+                if (name == c->name)
+                    return enterElement(context, parentElementContext, *c);
+    size_t n = name.find(':');
     if (n != std::string::npos)
     {
-        nameWithoutNamespace = name_.substr(n + 1);
-        name = &nameWithoutNamespace;
-    }
-    for (const ElementInfo* i = parentElementContext.info; i; i = i->base)
-        if (const ChildElementInfo* c = i->children)
-            for (; c->name; ++c)
-                if (*name == c->name)
-                {
-                    size_t& count = parentElementContext.processedElements[c];
-                    if (c->maxOccurs && count >= c->maxOccurs)
-                    {
-                        std::stringstream s;
-                        s << "Maximum occurrence of element '" << *name << "' is " << c->maxOccurs ;
-                        throwVerificationException(context.pos,  s.str());
-                    }
-                    ++count;
-                    elementContext.element = c->getElementField(parentElementContext.element);
-                    elementContext.info = c->info;
-                    elementContext.processedElements.reserve(c->info->childrenCount);
-                    return;
-                }
-    throwVerificationException(context.pos, "Unexpected element '" + name_ + "'");
-}
-
-void checkElement(Context& context, const ElementContext& elementContext)
-{
-    if (elementContext.info->mandatoryChildrenCount)
-        for (const ElementInfo* i = elementContext.info; i; i = i->base)
-            if (const ChildElementInfo* c = i->children)
+        std::string nameWithoutNamespace = name.substr(n + 1);
+        for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+            if (const xsdcpp::ChildElementInfo* c = i->children)
                 for (; c->name; ++c)
-                {
-                    std::unordered_map<const ChildElementInfo*, size_t>::const_iterator it = elementContext.processedElements.find(c);
-                    size_t count = it == elementContext.processedElements.end() ? 0 : it->second;
-                    if (count < c->minOccurs)
-                    {
-                        std::stringstream s;
-                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs ;
-                        throwVerificationException(context.pos, s.str());
-                    }
-                }
+                    if (nameWithoutNamespace == c->name)
+                        return enterElement(context, parentElementContext, *c);
+    }
+    throw VerificationException(context.pos, "Unexpected element '" + name + "'");
 }
 
-void setAttribute(Context& context, ElementContext& elementContext, std::string&& name, std::string&& value)
+void checkElement(Context& context, const xsdcpp::ElementContext& elementContext)
 {
-    uint64_t attribute = 1;
-    for (const ElementInfo* i = elementContext.info; i; i = i->base)
-        if (const AttributeInfo* a = i->attributes)
-            for (; a->name; ++a, attribute <<= 1)
+    if (elementContext.info->flags & xsdcpp::ElementInfo::CheckChildrenFlag)
+        for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+            if (const xsdcpp::ChildElementInfo* c = i->children)
+                for (; c->name; ++c)
+                    if (elementContext.processedElements2[c->trackIndex] < c->minOccurs)
+                    {
+                        std::stringstream s;
+                        s << "Minimum occurrence of element '" << c->name << "' is " << c->minOccurs;
+                        throw VerificationException(context.pos, s.str());
+                    }
+}
+
+void setAttribute(Context& context, xsdcpp::ElementContext& elementContext, std::string&& name, std::string&& value)
+{
+    for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+        if (const xsdcpp::AttributeInfo* a = i->attributes)
+            for (; a->name; ++a)
                 if (name == a->name)
                 {
-                    if (elementContext.processedAttributes & attribute)
-                        throwVerificationException(context.pos, "Repeated attribute '" + name + "'");
-                    elementContext.processedAttributes |= attribute;
-                    a->setAttribute(elementContext.element, context.pos, std::move(value));
+                    if (elementContext.processedAttributes2 & a->trackBit)
+                        throw VerificationException(context.pos, "Repeated attribute '" + name + "'");
+                    elementContext.processedAttributes2 |= a->trackBit;
+                    a->setValue(a->getAttribute(elementContext.element), context.pos, std::move(value));
                     return;
                 }
-    if (elementContext.info->flags & ElementInfo::Level1Flag)
+    if (elementContext.info->flags & xsdcpp::ElementInfo::EntryPointFlag)
     {
         if (name.compare(0, 5, "xmlns") == 0 && (name.size() == 5 || name.c_str()[5] == ':'))
         {
@@ -496,67 +446,52 @@ void setAttribute(Context& context, ElementContext& elementContext, std::string&
             size_t namespaceIndex = 0;
             for (const char** ns = context.namespaces; *ns; ++ns, ++namespaceIndex)
                 if (value == *ns)
-                {
-                    context.namespacePrefixToIndex.insert(std::pair<std::string, size_t>(namespacePrefix, namespaceIndex));
                     return;
-                }
-            throwVerificationException(context.pos, "Unknown namespace '" + value + "'");
+            throw VerificationException(context.pos, "Unknown namespace '" + value + "'");
         }
         size_t n = name.find(':');
-        if (n != std::string::npos && name.compare(n + 1, std::string::npos, "noNamespaceSchemaLocation") == 0)
+        if (n != std::string::npos)
         {
-            std::unordered_map<std::string, size_t>::const_iterator it = context.namespacePrefixToIndex.find(name.substr(0, n));
-            if (it != context.namespacePrefixToIndex.end() && strcmp(context.namespaces[it->second], "http://www.w3.org/2001/XMLSchema-instance") == 0)
-                return;
+            ++n;
+             if (name.compare(n, std::string::npos, "noNamespaceSchemaLocation") == 0 ||
+                 name.compare(n, std::string::npos, "schemaLocation") == 0)
+                 return;
         }
     }
-    for (const ElementInfo* i = elementContext.info; i; i = i->base)
-        if (i->flags & ElementInfo::AnyAttributeFlag)
+    for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+        if (i->flags & xsdcpp::ElementInfo::AnyAttributeFlag)
         {
             i->setOtherAttribute(elementContext.element, std::move(name), std::move(value));
             return;
         }
 
-    throwVerificationException(context.pos, "Unexpected attribute '" + name + "'");
+    throw VerificationException(context.pos, "Unexpected attribute '" + name + "'");
 }
 
-void addText(Context& context, ElementContext& elementContext, std::string&& text)
+void checkAttributes(Context& context, xsdcpp::ElementContext& elementContext)
 {
-    std::string& element = *(std::string*)elementContext.element;
-    if (element.empty())
-        element = std::move(text);
-    else
-        element += text;
-}
-
-void checkAttributes(Context& context, ElementContext& elementContext)
-{
-    uint64_t attributes = (uint64_t)-1 >> (64 - elementContext.info->attributesCount);
-    uint64_t missingAttributes = attributes & ~elementContext.processedAttributes;
+    uint64_t missingAttributes = elementContext.info->checkAttributeMask & ~elementContext.processedAttributes2;
     if (missingAttributes)
     {
-        uint64_t attribute = 1;
-        for (const ElementInfo* i = elementContext.info; i; i = i->base)
-            if (const AttributeInfo* a = i->attributes)
-                for (; a->name; ++a, attribute <<= 1)
-                    if (missingAttributes & attribute)
+        for (const xsdcpp::ElementInfo* i = elementContext.info; i; i = i->base)
+            if (const xsdcpp::AttributeInfo* a = i->attributes)
+                for (; a->name; ++a)
+                    if (missingAttributes & a->trackBit)
                     {
                         if (a->isMandatory)
-                            throwVerificationException(context.pos, "Missing attribute '" + std::string(a->name) + "'");
-                        if (a->setDefaultValue)
-                            a->setDefaultValue(elementContext.element);
+                            throw VerificationException(context.pos, "Missing attribute '" + std::string(a->name) + "'");
+                        a->setDefaultValue(elementContext.element);
                     }
     }
 }
 
-void parseElement(Context& context, ElementContext& parentElementContext)
+void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext)
 {
     readToken(context);
     if (context.token.type != Token::nameType)
-        throwSyntaxException(context.token.pos, "Expected tag name");
+        throw SyntaxException(context.token.pos, "Expected tag name");
     std::string elementName = std::move(context.token.value);
-    ElementContext elementContext;
-    enterElement(context, parentElementContext, elementName, elementContext);
+    xsdcpp::ElementContext elementContext = enterElement(context, parentElementContext, elementName);
     for (;;)
     {
         readToken(context);
@@ -573,10 +508,10 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             std::string attributeName = std::move(context.token.value);
             readToken(context);
             if (context.token.type != Token::equalsSignType)
-                throwSyntaxException(context.token.pos, "Expected '='");
+                throw SyntaxException(context.token.pos, "Expected '='");
             readToken(context);
             if (context.token.type != Token::stringType)
-                throwSyntaxException(context.token.pos, "Expected string");
+                throw SyntaxException(context.token.pos, "Expected string");
             std::string& attributeValue = context.token.value;
             setAttribute(context, elementContext, std::move(attributeName), std::move(attributeValue));
             continue;
@@ -585,17 +520,17 @@ void parseElement(Context& context, ElementContext& parentElementContext)
     checkAttributes(context, elementContext);
     for (;;)
     {
-        if (elementContext.info->flags & ElementInfo::ReadTextFlag)
+        if (elementContext.info->flags & xsdcpp::ElementInfo::ReadTextFlag)
         {
             const char* start = context.pos.pos;
-            if (elementContext.info->flags & ElementInfo::SkipProcessingFlag)
+            if (elementContext.info->flags & xsdcpp::ElementInfo::SkipProcessingFlag)
                 skipTextAndSubElements(context, elementName);
             else
                 skipText(context.pos);
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
-                addText(context, elementContext, std::move(text));
+                elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
         else
@@ -610,17 +545,41 @@ void parseElement(Context& context, ElementContext& parentElementContext)
             continue;
         }
         else
-            throwSyntaxException(context.token.pos, "Expected '<'");
+            throw SyntaxException(context.token.pos, "Expected '<'");
     }
     readToken(context);
     if (context.token.type != Token::nameType)
-        throwSyntaxException(context.token.pos, "Expected tag name");
+        throw SyntaxException(context.token.pos, "Expected tag name");
     if (context.token.value != elementName)
-        throwSyntaxException(context.token.pos, "Expected end tag of '" + elementName + "'");
+        throw SyntaxException(context.token.pos, "Expected end tag of '" + elementName + "'");
     readToken(context);
     if (context.token.type != Token::tagEndType)
-        throwSyntaxException(context.token.pos, "Expected '>'");
+        throw SyntaxException(context.token.pos, "Expected '>'");
     checkElement(context, elementContext);
+}
+
+}
+
+namespace xsdcpp {
+
+bool getListItem(const char*& s, std::string& result)
+{
+    while (isspace(*s))
+        ++s;
+    if (!*s)
+        return false;
+    const char* end = strpbrk(s, " \t\n\r");
+    if (end)
+    {
+        result = std::string(s, end - s);
+        s = end;
+    }
+    else
+    {
+        result = s;
+        s += result.size();
+    }
+    return true;
 }
 
 void parse(const char* data, const char** namespaces, ElementContext& elementContext)
@@ -638,7 +597,7 @@ void parse(const char* data, const char** namespaces, ElementContext& elementCon
         {
             const char* end = strpbrk(context.pos.pos, "\r\n?");
             if (!end)
-                throwSyntaxException(context.pos, "Unexpected end of file");
+                throw SyntaxException(context.pos, "Unexpected end of file");
             if (*end == '?' && end[1] == '>')
             {
                 context.pos.pos = end + 2;
@@ -651,56 +610,44 @@ void parse(const char* data, const char** namespaces, ElementContext& elementCon
     }
     readToken(context);
     if (context.token.type != Token::startTagBeginType)
-        throwSyntaxException(context.token.pos, "Expected '<'");
+        throw SyntaxException(context.token.pos, "Expected '<'");
     parseElement(context, elementContext);
 }
 
-uint32_t toType(const Position& pos, const char* const* values, const std::string& value)
+uint32_t toNumeric(const Position& pos, const char* const* values, const std::string& value)
 {
     for (const char* const* i = values; *i; ++i)
         if (value == *i)
             return (uint32_t)(i - values);
-    throwVerificationException(pos, "Unknown attribute value '" + value + "'");
-    return 0;
+    throw VerificationException(pos, "Unknown attribute value '" + value + "'");
 }
 
-template <typename T>
-T toType(const Position& pos, const std::string& value) { throwVerificationException(pos, "Not implemented"); return T(); }
-
-template <typename T>
-T toType(const Position& pos, const std::string& value, const char* exceptionMessage)
+std::string to_string(size_t val, size_t size, const char* const* values, const char* name)
 {
-    std::stringstream ss(value);
-    T result;
-    if (!(ss >> result))
-         throwVerificationException(pos, exceptionMessage);
-    return result;
+    if (val >= size)
+        throw std::invalid_argument("Invalid " + std::string(name) + " argument");
+    return values[val];
 }
 
-template <>
-uint64_t toType<uint64_t>(const Position& pos, const std::string& value) { return toType<uint64_t>(pos, value,  "Expected unsigned 64-bit integer value"); }
-template <>
-int64_t toType<int64_t>(const Position& pos, const std::string& value) { return toType<int64_t>(pos, value,  "Expected 64-bit integer value"); }
-template <>
-uint32_t toType<uint32_t>(const Position& pos, const std::string& value) { return toType<uint32_t>(pos, value,  "Expected unsigned 32-bit integer value"); }
-template <>
-int32_t toType<int32_t>(const Position& pos, const std::string& value) { return toType<int32_t>(pos, value,  "Expected 32-bit integer value"); }
-template <>
-uint16_t toType<uint16_t>(const Position& pos, const std::string& value) { return toType<uint16_t>(pos, value,  "Expected unsigned 16-bit integer value"); }
-template <>
-int16_t toType<int16_t>(const Position& pos, const std::string& value) { return toType<int16_t>(pos, value,  "Expected 16-bit integer value"); }
-template <>
-double toType<double>(const Position& pos, const std::string& value) { return toType<double>(pos, value,  "Expected single precision floating point value"); }
-template <>
-float toType<float>(const Position& pos, const std::string& value) { return toType<float>(pos, value,  "Expected double precision floating point value"); }
-template <>
-bool toType<bool>(const Position& pos, const std::string& value)
+void set_string(std::string* obj, const Position&, std::string&& val) { if (obj->empty()) *obj = std::move(val); else *obj += val; }
+void set_uint64_t(uint64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected unsigned 64-bit integer value"); }
+void set_int64_t(int64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected 64-bit integer value"); }
+void set_uint32_t(uint32_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected unsigned 32-bit integer value"); }
+void set_int32_t(int32_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected 32-bit integer value"); }
+void set_uint16_t(uint16_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected unsigned 16-bit integer value"); }
+void set_int16_t(int16_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected 16-bit integer value"); }
+void set_float(float* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected single precision floating point value"); }
+void set_double(double* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected double precision floating point value"); }
+void set_bool(bool* obj, const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> std::boolalpha >> *obj)) throw VerificationException(pos, "Expected boolean value"); }
+
+std::string read_file(const std::string& filePath)
 {
-    std::stringstream ss(value);
-    bool result;
-    if (!(ss >> std::boolalpha >> result))
-         throwVerificationException(pos, "Expected boolean value");
-    return result;
+    std::fstream file;
+    file.exceptions(std::fstream::failbit | std::fstream::badbit);
+    file.open(filePath, std::fstream::in);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
 }
 
 }

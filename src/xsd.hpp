@@ -5,10 +5,7 @@
 #define XSDCPP_H
 
 #include <cstdint>
-#include <new>
 #include <string>
-#include <type_traits>
-#include <utility>
 #include <vector>
 
 namespace xsd {
@@ -23,125 +20,121 @@ class optional
 {
 public:
     optional()
-        : _valid(false)
+        : _data(nullptr)
     {
     }
     optional(const optional& other)
-        : _valid(other._valid)
+        : _data(other._data ? new T(*other._data) : nullptr)
     {
-        if (_valid)
-            ::new (&_data) T(*(T*)&other._data);
     }
 
     optional(optional&& other)
-        : _valid(other._valid)
     {
-        if (_valid)
-        {
-            ::new (&_data) T(std::move(*(T*)&other._data));
-            ((T*)&other._data)->~T();
-            other._valid = false;
-        }
+        _data = other._data;
+        other._data = nullptr;
     }
 
     optional(const T& other)
-        : _valid(true)
+        : _data(new T(other))
     {
-        ::new (&_data) T(other);
     }
 
     optional(T&& other)
-        : _valid(true)
+        : _data(new T(std::move(other)))
     {
-        ::new (&_data) T(std::move(other));
     }
 
     ~optional()
     {
-        if (_valid)
-            ((T*)&_data)->~T();
+        delete _data;
     }
 
     optional& operator=(const optional& other)
     {
-        if (_valid != other._valid)
+        if (other._data)
         {
-            if (_valid)
-            {
-                ((T*)&_data)->~T();
-                _valid = false;
-            }
+            if (_data)
+                *_data = *other._data;
             else
-            {
-                ::new (&_data) T(*(T*)&other._data);
-                _valid = true;
-            }
+                _data = new T(*other._data);
         }
-        else if (_valid)
-            *(T*)&_data = *(T*)&other._data;
+        else
+        {
+            delete _data;
+            _data = nullptr;
+        }
         return *this;
     }
 
     optional& operator=(optional&& other)
     {
-        if (_valid != other._valid)
-        {
-            if (_valid)
-            {
-                ((T*)&_data)->~T();
-                _valid = false;
-            }
-            else
-            {
-                ::new (&_data) T(std::move(*(T*)&other._data));
-                _valid = true;
-                ((T*)&other._data)->~T();
-                other._valid = false;
-            }
-        }
-        else if (_valid)
-        {
-            *(T*)&_data = std::move(*(T*)&other._data);
-            ((T*)&other._data)->~T();
-            other._valid = false;
-        }
+        if (_data)
+            delete _data;
+        _data = other._data;
+        other._data = nullptr;
         return *this;
     }
 
     optional& operator=(const T& other)
     {
-        if (_valid)
-            *(T*)&_data = other;
+        if (_data)
+            *_data = other;
         else
-        {
-            ::new (&_data) T(other);
-            _valid = true;
-        }
+            _data = new T(other);
         return *this;
     }
 
     optional& operator=(T&& other)
     {
-        if (_valid)
-            *(T*)&_data = std::move(other);
+        if (_data)
+            *_data = std::move(other);
         else
-        {
-            ::new (&_data) T(std::move(other));
-            _valid = true;
-        }
+            _data = new T(std::move(other));
         return *this;
     }
 
-    operator bool() const { return _valid; }
+    operator bool() const { return _data != nullptr; }
 
-    T& operator*() { return *(T*)&_data; }
-    const T& operator*() const { return *(T*)&_data; }
-    T* operator->() { return (T*)&_data; }
-    const T* operator->() const { return (T*)&_data; }
+    T& operator*() { return *_data; }
+    const T& operator*() const { return *_data; }
+    T* operator->() { return _data; }
+    const T* operator->() const { return _data; }
+
+    friend bool operator==(const optional& lh, const T& rh) { return lh._data && *lh._data == rh; }
+    friend bool operator!=(const optional& lh, const T& rh) { return !lh._data || *lh._data != rh; }
+    friend bool operator==(const T& lh, const optional& rh) { return rh._data && lh == rh._data; }
+    friend bool operator!=(const T& lh, const optional& rh) { return !rh._data || lh != rh._data; }
+    friend bool operator==(const optional& lh, const optional& rh) { return lh._data == rh._data || (lh._data && rh._data && *lh._data == *rh._data); }
+    friend bool operator!=(const optional& lh, const optional& rh) { return lh._data != rh._data && (!lh._data || !rh._data || *lh._data != *rh._data); }
 
 private:
-    typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type _data;
-    bool _valid;
+    T* _data;
+};
+
+template <typename T>
+class base
+{
+public:
+    base()
+        : _value()
+    {
+    }
+    base(T value) 
+        : _value(value)
+    {
+    }
+
+    operator T() const { return _value; }
+    operator T&() { return _value; }
+
+    base& operator=(T value)
+    {
+        _value = value;
+        return *this;
+    }
+
+private:
+    T _value;
 };
 
 struct any_attribute

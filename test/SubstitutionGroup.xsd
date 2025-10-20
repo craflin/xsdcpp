@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:local="http://whatever.x/local" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/local">
+
+    <xsd:element abstract="true" name="Property" type="local:Property" />
+    <xsd:element name="BooleanProperty" substitutionGroup="local:Property" type="local:BooleanProperty" />
+    <xsd:element name="FloatingPointProperty" substitutionGroup="local:Property" type="local:FloatingPointProperty" />
+
+    <xsd:complexType abstract="true" name="MyBase">
+        <xsd:attribute name="name" type="xsd:string" use="required" />
+        <xsd:attribute name="description" type="xsd:string" />
+    </xsd:complexType>
+
+    <xsd:complexType abstract="true" name="Property">
+        <xsd:complexContent>
+            <xsd:extension base="local:MyBase" />
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="BooleanProperty">
+        <xsd:complexContent>
+            <xsd:extension base="local:Property">
+                <xsd:attribute name="value" type="xsd:boolean" />
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+    <xsd:complexType name="FloatingPointProperty">
+        <xsd:complexContent>
+            <xsd:extension base="local:Property">
+                <xsd:attribute name="value" type="xsd:double" />
+            </xsd:extension>
+        </xsd:complexContent>
+    </xsd:complexType>
+
+    <xsd:element name="Main" type="local:Main" />
+
+    <xsd:complexType name="Main">
+        <xsd:sequence>
+            <xsd:element maxOccurs="unbounded" minOccurs="0" ref="local:Property" />
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="Main2" type="local:Main2" />
+
+    <xsd:complexType name="Main2">
+        <xsd:sequence>
+            <xsd:element maxOccurs="1" minOccurs="0" ref="local:Property" />
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:element name="Main3" type="local:Main3" />
+
+    <xsd:complexType name="Main3">
+        <xsd:sequence>
+            <xsd:element maxOccurs="1" minOccurs="1" ref="local:Property" />
+        </xsd:sequence>
+    </xsd:complexType>
+
+</xsd:schema>

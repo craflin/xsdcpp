@@ -1,23 +1,8 @@
 
+#include "../src/XmlParser.hpp"
 #include "../src/XmlParser.cpp"
 
 #include <gtest/gtest.h>
-
-void fixUnusedToTypeWarning()
-{
-    toType(Position(), nullptr, std::string());
-    toType<uint64_t>(Position(), std::string());
-    toType<int64_t>(Position(), std::string());
-    toType<uint32_t>(Position(), std::string());
-    toType<int32_t>(Position(), std::string());
-    toType<uint16_t>(Position(), std::string());
-    toType<int16_t>(Position(), std::string());
-    toType<double>(Position(), std::string());
-    toType<float>(Position(), std::string());
-    toType<bool>(Position(), std::string());
-    ElementContext elementContext;
-    parse(nullptr, nullptr, elementContext);
-}
 
 TEST(Parser, unescapeString)
 {

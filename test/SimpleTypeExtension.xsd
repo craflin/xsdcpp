@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:local="http://whatever.x/local" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/local">
+
+    <xsd:element name="MainEnum" type="local:MainEnum" />
+    <xsd:element name="MainInt" type="local:MainInt" />
+    <xsd:element name="MainStr" type="local:MainStr" />
+    <xsd:element name="MainEnumList" type="local:MainEnumList" />
+    <xsd:element name="MainWithListElement" type="local:MainWithListElement" />
+
+    <xsd:element name="Version" type="local:Version" />
+    
+    <xsd:simpleType name="XEnumZZ">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="A"/>
+            <xsd:enumeration value="B"/>
+            <xsd:enumeration value="C"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+
+    <xsd:complexType name="MainEnum">
+        <xsd:simpleContent>
+            <xsd:extension base="local:XEnumZZ">
+                <xsd:attribute name="entity" type="xsd:string" />
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="MainInt">
+        <xsd:simpleContent>
+            <xsd:extension base="xsd:nonNegativeInteger">
+                <xsd:attribute name="entity" type="xsd:string" />
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="MainStr">
+        <xsd:simpleContent>
+            <xsd:extension base="xsd:string">
+                <xsd:attribute name="entity" type="xsd:string" />
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:simpleType name="MyList">
+        <xsd:list>
+            <xsd:simpleType>
+                <xsd:restriction base="xsd:string">
+                    <xsd:enumeration value="A" />
+                    <xsd:enumeration value="B" />
+                    <xsd:enumeration value="C" />
+                </xsd:restriction>
+            </xsd:simpleType>
+        </xsd:list>
+    </xsd:simpleType>
+
+    <xsd:complexType name="MainEnumList">
+        <xsd:simpleContent>
+            <xsd:extension base="local:MyList">
+                <xsd:attribute name="entity" type="xsd:string" />
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="MainWithListElement">
+        <xsd:sequence>
+            <xsd:element maxOccurs="unbounded" minOccurs="0" name="MyList" type="local:MyList" />
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:simpleType  name="Version">
+        <xsd:restriction base="xsd:string">
+            <xsd:pattern value="[0-9]+\.[0-9]+\.[0-9]+[\.A-Za-z_0-9\-]*" />
+        </xsd:restriction>
+    </xsd:simpleType>
+    
+</xsd:schema>
+
+

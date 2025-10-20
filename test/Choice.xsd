@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xsd:schema xmlns:local="http://whatever.x/local" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/local">
+
+    <xsd:complexType name="MainType">
+        <xsd:choice maxOccurs="unbounded">
+            <xsd:element maxOccurs="unbounded" minOccurs="0" name="ChoiceA" type="local:ChoiceA" />
+            <xsd:element maxOccurs="unbounded" minOccurs="0" name="ChoiceB" type="local:ChoiceB" />
+        </xsd:choice>
+        <xsd:attribute name="attr" type="xsd:string" use="required" />
+    </xsd:complexType>
+
+    <xsd:complexType name="ChoiceA">
+        <xsd:attribute name="name" type="xsd:string" use="required" />
+        <xsd:attribute name="value" type="xsd:string" use="optional" />
+    </xsd:complexType>
+
+    <xsd:complexType name="ChoiceB">
+        <xsd:attribute name="name" type="xsd:string" use="optional" />
+        <xsd:attribute name="value" type="xsd:string" use="optional" />
+    </xsd:complexType>
+
+    <xsd:element name="Main" type="local:MainType" />
+
+</xsd:schema>
