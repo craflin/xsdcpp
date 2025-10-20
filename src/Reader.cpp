@@ -257,9 +257,6 @@ private:
                 if (schemaLocation.startsWith("platform:"))
                     schemaLocation = File::getBaseName(schemaLocation); // assume all XSD files can be found in the same folder
 
-                if (schemaLocation == "Ecore.xsd") // I hope we don't need this
-                    continue;
-
                 if (!File::isAbsolutePath(schemaLocation))
                     schemaLocation = File::getDirectoryName(_path) + "/" + schemaLocation;
 
