@@ -12,7 +12,7 @@ But, you can also create the data model and parser out of the XSD file within yo
 
 ## Motivation
 
-When using XML in an C++ project, it is very common to parse the XML into a DOM tree with some third party library and to just extract information relevant to you without considering its XSD schema.
+When using XML in a C++ project, it is very common to parse the XML into a DOM tree with some third party library and to just extract information relevant to you without considering its XSD schema.
 If verification against an XSD schema is desired, you usually use a library like libxml2 that reads the XSD at runtime and does the verification, but you still need to manually write code to convert the DOM tree into your C++ data model.
 
 Loading an XML file this way is unnecessarily slow and manually writing the code to convert the XML data into a C++ data model is time consuming and error prone.
@@ -21,12 +21,12 @@ However, they will probably require you to link against some library.
 Since dependency management in C++ projects is not an entirely solved problem, having to depend on a library might be an issue.
 It is especially inconvenient if you want to provide a platform independent library that does something with XML based on an XSD without imposing any third party dependencies to your library users.
 
-XSDCPP solves the issue by creating a data model and parser that can be added to your library without additional dependencies for the library users.
+XSDCPP solves the issue by creating a data model and parser that can easily be added to your library without additional dependencies for the library users.
 
 ## Features and Limitations
 
-Since XSD is bloated with weirdness and features, its very hard to support all of them. 
-So, XSDCPP does just support what was thrown at it so far and there are probably some severe limitations.
+Since XSD is full of features (and unnecessary complexity), its very hard to support all of them. 
+So, XSDCPP does currently just support what was thrown at it so far and there are probably some severe limitations.
 
 Notable supported features:
 * elements mapped to a C++ struct,
