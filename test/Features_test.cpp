@@ -7,6 +7,7 @@
 #include "Import.hpp"
 #include "Attributes.hpp"
 #include "Occurrence.hpp"
+#include "Example.hpp"
 
 #include <gtest/gtest.h>
 
@@ -289,6 +290,36 @@ TEST(Features, Element_Occurrence)
         }
     }
 
+}
+
+
+TEST(Features, Example)
+{
+    Example::List list;
+    Example::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+<List>
+    <Person>
+        <Name age="40">John Smith</Name>
+        <Country comment="not sure">UK</Country>
+    </Person>
+    <Person>
+        <Name age="54" hidden="false">Mary Jones</Name>
+    </Person>
+</List>
+)", list);
+    EXPECT_EQ(list.Person.size(), 2);
+    EXPECT_EQ(list.Person[0].Name, "John Smith");
+    EXPECT_EQ(list.Person[0].Name.age, 40);
+    EXPECT_EQ(list.Person[0].Name.hidden, true);
+    EXPECT_FALSE(list.Person[0].Name.comment);
+    EXPECT_TRUE(list.Person[0].Country);
+    EXPECT_EQ(*list.Person[0].Country, Example::CountryCode::UK);
+    EXPECT_TRUE(list.Person[0].Country->comment);
+    EXPECT_EQ(*list.Person[0].Country->comment, "not sure");
+    EXPECT_EQ(list.Person[1].Name, "Mary Jones");
+    EXPECT_EQ(list.Person[1].Name.hidden, false);
+    EXPECT_FALSE(list.Person[1].Name.comment);
+    EXPECT_FALSE(list.Person[1].Country);
 }
 
 // todo:

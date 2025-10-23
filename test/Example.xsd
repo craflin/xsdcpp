@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:example="http://whatever.x/example" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/example">
+
+    <xsd:complexType name="List">
+        <xsd:sequence>
+            <xsd:element name="Person" maxOccurs="unbounded" type="example:Person"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="Person">
+        <xsd:sequence>
+            <xsd:element name="Name" type="example:Name"/>
+            <xsd:element name="Country" minOccurs="0" type="example:Country"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="Name">
+        <xsd:simpleContent>
+            <xsd:extension base="xsd:string">
+                <xsd:attribute name="comment" type="xsd:string"/>
+                <xsd:attribute name="age" type="xsd:int" use="required"/>
+                <xsd:attribute name="hidden" type="xsd:boolean" default="true"/>
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="Country">
+        <xsd:simpleContent>
+            <xsd:extension base="example:CountryCode">
+                <xsd:attribute name="comment" type="xsd:string"/>
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:simpleType name="CountryCode">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="DE"/>
+            <xsd:enumeration value="FR"/>
+            <xsd:enumeration value="ES"/>
+            <xsd:enumeration value="UK"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+
+    <xsd:element name="List" type="example:List"/>
+
+</xsd:schema>

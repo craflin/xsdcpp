@@ -67,6 +67,11 @@ add_custom_command(
     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Occurrence.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Occurrence.cpp"
     DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Occurrence.xsd"
 )
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd" -o "${CMAKE_CURRENT_BINARY_DIR}" -e xsdcpp
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Example.hpp" "${CMAKE_CURRENT_BINARY_DIR}/Example.cpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd"
+)
 add_executable(Features_test
     Features_test.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/SubstitutionGroup.hpp"
@@ -83,6 +88,8 @@ add_executable(Features_test
     "${CMAKE_CURRENT_BINARY_DIR}/Attributes.cpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Occurrence.hpp"
     "${CMAKE_CURRENT_BINARY_DIR}/Occurrence.cpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Example.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/Example.cpp"
 )
 target_require_cpp11(Features_test)
 target_link_libraries(Features_test PRIVATE mingtest::gtest mingtest::gtest_main)
