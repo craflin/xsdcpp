@@ -11,6 +11,8 @@
 
 #include <gtest/gtest.h>
 
+#include <iostream>
+
 TEST(Features, Enums)
 {
     EXPECT_EQ(SimpleTypeExtension::XEnumZZ::A, (SimpleTypeExtension::XEnumZZ)0);
@@ -320,6 +322,14 @@ TEST(Features, Example)
     EXPECT_EQ(list.Person[1].Name.hidden, false);
     EXPECT_FALSE(list.Person[1].Name.comment);
     EXPECT_FALSE(list.Person[1].Country);
+
+    for (const auto& person : list.Person)
+    {
+        std::cout << person.Name << " (" << person.Name.age << ")";
+        if (person.Country)
+            std::cout << " from " << Example::to_string(*person.Country);
+        std::cout << std::endl;
+    }
 }
 
 // todo:

@@ -59,3 +59,141 @@ Intentionally not supported features:
 * Clone the Git repository.
 * Initialize submodules.
 * Build the project using CMake or Conan.
+
+## Example
+
+An XSD schema *Example.xsd* like this:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns:example="http://whatever.x/example" xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://whatever.x/example">
+
+    <xsd:complexType name="List">
+        <xsd:sequence>
+            <xsd:element name="Person" maxOccurs="unbounded" type="example:Person"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="Person">
+        <xsd:sequence>
+            <xsd:element name="Name" type="example:Name"/>
+            <xsd:element name="Country" minOccurs="0" type="example:Country"/>
+        </xsd:sequence>
+    </xsd:complexType>
+
+    <xsd:complexType name="Name">
+        <xsd:simpleContent>
+            <xsd:extension base="xsd:string">
+                <xsd:attribute name="comment" type="xsd:string"/>
+                <xsd:attribute name="age" type="xsd:int" use="required"/>
+                <xsd:attribute name="hidden" type="xsd:boolean" default="true"/>
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:complexType name="Country">
+        <xsd:simpleContent>
+            <xsd:extension base="example:CountryCode">
+                <xsd:attribute name="comment" type="xsd:string"/>
+            </xsd:extension>
+        </xsd:simpleContent>
+    </xsd:complexType>
+
+    <xsd:simpleType name="CountryCode">
+        <xsd:restriction base="xsd:string">
+            <xsd:enumeration value="DE"/>
+            <xsd:enumeration value="FR"/>
+            <xsd:enumeration value="ES"/>
+            <xsd:enumeration value="UK"/>
+        </xsd:restriction>
+    </xsd:simpleType>
+
+    <xsd:element name="List" type="example:List"/>
+
+</xsd:schema>
+```
+Can be converted to C++ using `xsdcpp`:
+```
+xsdcpp Example.xsd -o /your/output/folder
+```
+The converter creates three files in */your/output/folder*: *Example.cpp*, *Example.hpp*, and *Example_xsd.hpp*.
+
+*Example.hpp* provides a data model like this:
+```cpp
+namespace Example {
+
+struct List;
+struct Person;
+struct Name;
+struct Country;
+
+struct List
+{
+    xsd::vector<Example::Person> Person;
+};
+
+struct Name : xsd::string
+{
+    xsd::optional<xsd::string> comment;
+    int32_t age;
+    bool hidden;
+};
+
+struct Person
+{
+    Example::Name Name;
+    xsd::optional<Example::Country> Country;
+};
+
+enum class CountryCode
+{
+    DE,
+    FR,
+    ES,
+    UK,
+};
+
+struct Country : xsd::base<Example::CountryCode>
+{
+    xsd::optional<xsd::string> comment;
+};
+
+}
+```
+And functions to load an XML file or XML data from a string:
+```cpp
+void load_file(const std::string& file, List& List);
+void load_data(const std::string& data, List& List);
+```
+(The implementation of these functions can be found in *Example.cpp* and *Example_xsd.hpp* provides the types of the *xsd* namespace.)
+
+Now, you can add *Example.cpp*, *Example.hpp*, and *Example_xsd.hpp* to your project and write code to load XML data:
+```cpp
+#include <Example.hpp>
+#include <iostream>
+
+int main()
+{
+    Example::List list;
+    Example::load_data(R"(<?xml version="1.0" encoding="UTF-8"?>
+<List>
+    <Person>
+        <Name age="40">John Smith</Name>
+        <Country comment="not sure">UK</Country>
+    </Person>
+    <Person>
+        <Name age="54" hidden="false">Mary Jones</Name>
+    </Person>
+</List>
+)", list);
+
+    for (const auto& person : list.Person)
+    {
+        std::cout << person.Name << " (" << person.Name.age << ")";
+        if (person.Country)
+            std::cout << " from " << Example::to_string(*person.Country);
+        std::cout << std::endl;
+    }
+    return 0;
+}
+```
+The generated functions will validate the input data to some degree and throw exceptions for missing or unknown elements or attributes etc..
