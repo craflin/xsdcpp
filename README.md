@@ -29,10 +29,10 @@ Since XSD is full of features (and unnecessary complexity), its very hard to sup
 So, XSDCPP does currently just support what was thrown at it so far and there are probably some severe limitations.
 
 Notable supported features:
-* elements mapped to a C++ struct,
+* elements mapped to C++ structs,
 * optional elements and lists of elements,
 * elements derived from a simple type,
-* basic attribute data types that are mapped to a `std::string`, an integer type, a floating point type, or a generated C++ enum class,
+* basic attribute data types that are mapped to a `std::string`, boolean, integer, or floating point type, or a generated C++ enum class,
 * attributes with list types,
 * default attribute values,
 * attribute presence validation,
@@ -52,7 +52,7 @@ Known missing feature are:
 
 Intentionally not supported features:
 * codecs other than UTF-8,
-* element sequence validation.
+* element sequence order validation.
 
 ## Build Instructions
 
