@@ -12,13 +12,14 @@ class xsdcppConan(ConanFile):
     description = "An XSD schema to C++ data model and parser converter"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "3rdparty/*", "src/*", "test/*", "CDeploy", "CMakeLists.txt", "LICENSE", "NOTICE", "README.md"
+    vendor = True
 
     def set_version(self):
         content = load(self, os.path.join(self.recipe_folder, "CMakeLists.txt"))
         self.version = re.search("project\\([^ ]* VERSION ([0-9.]*)", content).group(1)
 
     def build_requirements(self):
-        self.tool_requires("cmake/3.30.1")
+        self.tool_requires("cmake/[>=3.30.1]")
 
     def generate(self):
         ms = VirtualBuildEnv(self)
