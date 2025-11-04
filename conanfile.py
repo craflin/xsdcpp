@@ -12,7 +12,6 @@ class xsdcppConan(ConanFile):
     description = "An XSD schema to C++ data model and parser converter"
     settings = "os", "compiler", "build_type", "arch"
     exports_sources = "3rdparty/*", "src/*", "test/*", "CDeploy", "CMakeLists.txt", "LICENSE", "NOTICE", "README.md"
-    vendor = True
 
     def set_version(self):
         content = load(self, os.path.join(self.recipe_folder, "CMakeLists.txt"))
