@@ -276,39 +276,39 @@ private:
             if (type.kind == Xsd::Type::StringKind)
             {
                 if (compareXsName(typeName, "normalizedString") || compareXsName(typeName, "string") || compareXsName(typeName, "anyURI"))
-                    return "xsd::string";
+                    return String("xsd::string");
             }
 
             if (type.kind == Xsd::Type::BaseKind)
             {
                 if (compareXsName(typeName, "nonNegativeInteger") || compareXsName(typeName, "positiveInteger") || compareXsName(typeName, "unsignedLong"))
-                    return "uint64_t";
+                    return String("uint64_t");
 
                 if (compareXsName(typeName, "integer") || compareXsName(typeName, "long"))
-                    return "int64_t";
+                    return String("int64_t");
 
                 if (compareXsName(typeName, "unsignedInt"))
-                    return "uint32_t";
+                    return String("uint32_t");
 
                 if (compareXsName(typeName, "int"))
-                    return "int32_t";
+                    return String("int32_t");
 
                 if (compareXsName(typeName, "unsignedShort"))
-                    return "uint16_t";
+                    return String("uint16_t");
 
                 if (compareXsName(typeName, "short"))
-                    return "int16_t";
+                    return String("int16_t");
 
                 if (compareXsName(typeName, "double") || compareXsName(typeName, "decimal"))
-                    return "double" ;
+                    return String("double");
 
                 if (compareXsName(typeName, "float"))
-                    return "float";
+                    return String("float");
 
                 if (compareXsName(typeName, "boolean"))
-                    return "bool";
+                    return String("bool");
 
-                return "??not_supported";
+                return String("??not_supported");
             }
         }
 
@@ -353,7 +353,7 @@ private:
     {
         String cppName = toCppTypeIdentifier2(typeName);
         if (cppName == "xsd::string")
-            return "xsdcpp::set_string";
+            return String("xsdcpp::set_string");
         if (cppName == "uint64_t" ||
             cppName == "int64_t" ||
             cppName == "uint32_t" ||
