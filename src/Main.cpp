@@ -7,7 +7,38 @@
 
 void usage(const char* argv0)
 {
-    Console::errorf("Usage: %s [<xsd-file>] [-o <output-dir>] [-n <schema-name>]\n", argv0);
+    Console::errorf("xsdcpp %s, XSD schema to C++ data model and XML parser library converter.\n\
+\n\
+Usage: xsdcpp [<xsd-file>] [-o <output-dir>]\n\
+\n\
+Options:\n\
+\n\
+    <xsd-file>\n\
+        The path to the input XSD schema file.\n\
+\n\
+    -o <output-dir>, --output=<output-dir>\n\
+        The folder in which the output files are created.\n\
+\n\
+    -e <namespace>, --extern=<namespace>\n\
+        A namespace that should not be generated in the output files and hence\n\
+        must be provided separately. This should be used to avoid code\n\
+        duplication if you have a schema that is the base for multiple other\n\
+        schemas. It can be set to 'xsdcpp' to omit the generation of the core\n\
+        parser library, which is needed if you want to link multiple independent\n\
+        data models to the same library or executable.\n\
+\n\
+    -n <namespace>, --name=<namespace>\n\
+        The namespace used for the generated data model and base name of the\n\
+        output files. The default, is derived from <xsd-file>.\n\
+\n\
+    -t <type>, --type=<type>\n\
+        By default, C++ type definitions are only generated for types that are\n\
+        directly in indirectly referenced from an XML element defined at root\n\
+        level. However, some additional types might be needed if another schema\n\
+        references types from the input schema. The '-t' option can be used to\n\
+        enforce the generation of such types.\n\
+\n\
+", VERSION);
 }
 
 int main(int argc, char* argv[])
