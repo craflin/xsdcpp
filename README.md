@@ -56,9 +56,10 @@ Intentionally not supported features:
 
 ## Build Instructions
 
-* Clone the Git repository.
-* Initialize submodules.
-* Build the project using CMake or Conan.
+* Install Git, a C++ compiler (like GCC or Visual Studio) and CMake or Conan.
+* Clone the Git repository. `git clone https://github.com/craflin/xsdcpp.git`
+* Initialize submodules. `cd xsdcpp && git submodule update --init`
+* Build the project using CMake (`mkdir build && cd build && cmake .. && cmake --build .`) or Conan (`mkdir build && cd build && conan install .. && conan build ..`).
 
 ## Example
 
