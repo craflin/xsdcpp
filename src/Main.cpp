@@ -34,9 +34,9 @@ Options:\n\
     -t <type>, --type=<type>\n\
         By default, C++ type definitions are only generated for types that are\n\
         directly in indirectly referenced from an XML element defined at root\n\
-        level. However, some additional types might be needed they are\n\
+        level. However, some additional types might be needed if they are\n\
         referenced from another schema that is based on the input schema. The\n\
-        '-t' option can be used to enforce the generation of such types.\n\
+        option '-t' can be used to enforce the generation of such types.\n\
 \n\
 ", VERSION);
 }
