@@ -332,6 +332,80 @@ TEST(Features, Example)
     }
 }
 
+TEST(Features, SaveLoad_RoundTrip)
+{
+    // Create original data
+    Example::List original;
+    original.Person.emplace_back();
+    static_cast<xsd::string&>(original.Person[0].Name) = "John Smith";
+    original.Person[0].Name.age = 40;
+    original.Person[0].Name.hidden = true;
+    original.Person[0].Country = Example::Country();
+    static_cast<xsd::base<Example::CountryCode>&>(*original.Person[0].Country) = Example::CountryCode::UK;
+    original.Person[0].Country->comment = "home country";
+
+    original.Person.emplace_back();
+    static_cast<xsd::string&>(original.Person[1].Name) = "Mary Jones";
+    original.Person[1].Name.age = 54;
+    original.Person[1].Name.hidden = false;
+
+    // Save to XML string
+    std::string xml = Example::save_data(original);
+
+    // Load back
+    Example::List loaded;
+    Example::load_data(xml, loaded);
+
+    // Verify round-trip
+    EXPECT_EQ(loaded.Person.size(), 2);
+    EXPECT_EQ(loaded.Person[0].Name, "John Smith");
+    EXPECT_EQ(loaded.Person[0].Name.age, 40);
+    EXPECT_EQ(loaded.Person[0].Name.hidden, true);
+    EXPECT_TRUE(loaded.Person[0].Country);
+    EXPECT_EQ(*loaded.Person[0].Country, Example::CountryCode::UK);
+    EXPECT_TRUE(loaded.Person[0].Country->comment);
+    EXPECT_EQ(*loaded.Person[0].Country->comment, "home country");
+
+    EXPECT_EQ(loaded.Person[1].Name, "Mary Jones");
+    EXPECT_EQ(loaded.Person[1].Name.age, 54);
+    EXPECT_EQ(loaded.Person[1].Name.hidden, false);
+    EXPECT_FALSE(loaded.Person[1].Country);
+}
+
+TEST(Features, SaveLoad_SubstitutionGroup_RoundTrip)
+{
+    // Create original data with substitution group
+    SubstitutionGroup::Main original;
+    original.Property.emplace_back();
+    original.Property[0].BooleanProperty = SubstitutionGroup::BooleanProperty();
+    original.Property[0].BooleanProperty->name = "enabled";
+    original.Property[0].BooleanProperty->value = true;
+
+    original.Property.emplace_back();
+    original.Property[1].FloatingPointProperty = SubstitutionGroup::FloatingPointProperty();
+    original.Property[1].FloatingPointProperty->name = "ratio";
+    original.Property[1].FloatingPointProperty->value = 3.14;
+
+    // Save to XML string
+    std::string xml = SubstitutionGroup::save_data(original);
+
+    // Load back
+    SubstitutionGroup::Main loaded;
+    SubstitutionGroup::load_data(xml, loaded);
+
+    // Verify round-trip
+    EXPECT_EQ(loaded.Property.size(), 2);
+    EXPECT_TRUE(loaded.Property[0].BooleanProperty);
+    EXPECT_FALSE(loaded.Property[0].FloatingPointProperty);
+    EXPECT_EQ(loaded.Property[0].BooleanProperty->name, "enabled");
+    EXPECT_EQ(loaded.Property[0].BooleanProperty->value, true);
+
+    EXPECT_FALSE(loaded.Property[1].BooleanProperty);
+    EXPECT_TRUE(loaded.Property[1].FloatingPointProperty);
+    EXPECT_EQ(loaded.Property[1].FloatingPointProperty->name, "ratio");
+    EXPECT_EQ(loaded.Property[1].FloatingPointProperty->value, 3.14);
+}
+
 // todo:
 
 // Int Attribute out of range
