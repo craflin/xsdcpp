@@ -119,11 +119,12 @@ bool compareXsName(const Xsd::Name& name, const String& rh)
 class Generator
 {
 public:
-    Generator(const Xsd& xsd, const List<String>& externalNamespacePrefixes, const List<String>& forceTypeProcessing, List<String>& cppOutput, List<String>& hppOutput)
+    Generator(const Xsd& xsd, const List<String>& externalNamespacePrefixes, const List<String>& forceTypeProcessing, List<String>& cppOutput, List<String>& hppOutput, bool noInnerNamespace)
         : _xsd(xsd)
         , _externalNamespacePrefixes(externalNamespacePrefixes)
         , _cppOutputFinal(cppOutput)
         , _hppOutput(hppOutput)
+        , _noInnerNamespace(noInnerNamespace)
     {
         for (List<String>::Iterator i = forceTypeProcessing.begin(), end = forceTypeProcessing.end(); i != end; ++i)
         {
@@ -207,8 +208,11 @@ public:
             _hppOutput.append(String("#include \"") + _cppNamespace + "_xsd.hpp\"");
         _hppOutput.append("");
 
-        _hppOutput.append(String("namespace ") + _cppNamespace + " {");
-        _hppOutput.append("");
+        if (!_noInnerNamespace)
+        {
+            _hppOutput.append(String("namespace ") + _cppNamespace + " {");
+            _hppOutput.append("");
+        }
 
         for (HashSet<Xsd::Name>::Iterator i = localElementTypes.begin(), end = localElementTypes.end(); i != end; ++i)
         {
@@ -247,13 +251,16 @@ public:
             _hppOutput.append("");
         }
 
-        _hppOutput.append("}");
+        if (!_noInnerNamespace)
+            _hppOutput.append("}");
 
-        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputNamespaceElementInfoExtern);
         _cppOutputFinal.append("");
-        _cppOutputFinal.append("}");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
         _cppOutputFinal.append("namespace {");
@@ -263,11 +270,13 @@ public:
         _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
-        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputNamespaceSetValue);
         _cppOutputFinal.append("");
-        _cppOutputFinal.append("}");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
         _cppOutputFinal.append("namespace {");
@@ -277,7 +286,8 @@ public:
         _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
-        _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append(String("namespace ") + _cppNamespace + " {");
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputNamespace);
         _cppOutputFinal.append("");
@@ -305,7 +315,8 @@ public:
         }
 
 
-        _cppOutputFinal.append("}");
+        if (!_noInnerNamespace)
+            _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
         return true;
@@ -314,6 +325,7 @@ public:
 private:
     const Xsd& _xsd;
     const List<String>& _externalNamespacePrefixes;
+    bool _noInnerNamespace;
 
     HashMap<String, String> _externalNamespaces;
 
@@ -406,6 +418,8 @@ private:
         String namespacePrefix;
         if (isNamespaceExternal(typeName.xsdNamespace, namespacePrefix))
             return namespacePrefix + "::" + result;
+        if (_noInnerNamespace)
+            return result;
         return _cppNamespace + "::" + result;
     }
 
@@ -414,6 +428,8 @@ private:
         String namespacePrefix;
         if (isNamespaceExternal(typeName.xsdNamespace, namespacePrefix))
             return namespacePrefix;
+        if (_noInnerNamespace)
+            return String();
         return _cppNamespace;
     }
 
@@ -433,7 +449,10 @@ private:
             return String("xsdcpp::set_") + cppName;
         if (cppName == "bool")
             return String("xsdcpp::set_bool");
-        return toCppNamespacePrefix(typeName) + "::_set_" + cppName;
+        String prefix = toCppNamespacePrefix(typeName);
+        if (prefix.isEmpty())
+            return String("_set_") + cppName;
+        return prefix + "::_set_" + cppName;
     }
 
     usize getChildrenCount(const Xsd::Name& typeName) const
@@ -1314,11 +1333,11 @@ private:
 
 }
 
-bool generateCpp(const Xsd& xsd, const String& headerOutputDir, const String& cppOutputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, const String& wrapNamespace, String& error)
+bool generateCpp(const Xsd& xsd, const String& headerOutputDir, const String& cppOutputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, const String& wrapNamespace, bool noInnerNamespace, String& error)
 {
     List<String> cppOutput;
     List<String> hppOutput;
-    Generator generator(xsd, excludedNamespacePrefixes, forceTypeProcessing, cppOutput, hppOutput);
+    Generator generator(xsd, excludedNamespacePrefixes, forceTypeProcessing, cppOutput, hppOutput, noInnerNamespace);
     if (!generator.process())
         return (error = generator.getError()), false;
 
@@ -1336,8 +1355,9 @@ bool generateCpp(const Xsd& xsd, const String& headerOutputDir, const String& cp
         bool wroteNsOpen = wrapNamespace.isEmpty();
         for (List<String>::Iterator i = hppOutput.begin(), end = hppOutput.end(); i != end; ++i)
         {
-            // Insert wrap namespace before the first namespace declaration
-            if (!wroteNsOpen && i->startsWith("namespace "))
+            // Insert wrap namespace before the first content (namespace, struct, enum, etc.)
+            // but after #pragma, #include, and empty lines
+            if (!wroteNsOpen && !i->isEmpty() && !i->startsWith("#"))
             {
                 if (!outputFile.write(nsOpen))
                     return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;

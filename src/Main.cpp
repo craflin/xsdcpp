@@ -43,6 +43,10 @@ Options:\n\
         Wrap all generated code in an additional C++ namespace. Supports nested\n\
         namespaces using '::' syntax (e.g., 'a::b::c').\n\
 \n\
+    -N, --no-inner-namespace\n\
+        Skip generating the inner namespace (derived from --name or schema\n\
+        filename). Types will be placed directly in the wrap namespace.\n\
+\n\
     -t <type>, --type=<type>\n\
         By default, C++ type definitions are only generated for types that are\n\
         directly in indirectly referenced from an XML element defined at root\n\
@@ -61,6 +65,7 @@ int main(int argc, char* argv[])
     String cppOutputDir;
     String name;
     String wrapNamespace;
+    bool noInnerNamespace = false;
     List<String> externalNamespacePrefixes;
     List<String> forceTypeProcessing;
     {
@@ -70,6 +75,7 @@ int main(int argc, char* argv[])
             {'C', "cpp-output", Process::argumentFlag},
             {'n', "name", Process::argumentFlag},
             {'w', "wrap-namespace", Process::argumentFlag},
+            {'N', "no-inner-namespace", Process::optionFlag},
             {'h', "help", Process::optionFlag},
             {'e', "extern", Process::argumentFlag},
             {'t', "type", Process::argumentFlag},
@@ -95,6 +101,9 @@ int main(int argc, char* argv[])
                 break;
             case 'w':
                 wrapNamespace = argument;
+                break;
+            case 'N':
+                noInnerNamespace = true;
                 break;
             case 'e':
                 externalNamespacePrefixes.append(argument);
@@ -130,7 +139,7 @@ int main(int argc, char* argv[])
     String error;
     Xsd xsd;
     if (!readXsd(name, inputFile, forceTypeProcessing, xsd, error) ||
-        !generateCpp(xsd, headerOutputDir, cppOutputDir, externalNamespacePrefixes, forceTypeProcessing, wrapNamespace, error))
+        !generateCpp(xsd, headerOutputDir, cppOutputDir, externalNamespacePrefixes, forceTypeProcessing, wrapNamespace, noInnerNamespace, error))
     {
         Console::errorf("error: %s\n", (const char*)error);
         return 1;
