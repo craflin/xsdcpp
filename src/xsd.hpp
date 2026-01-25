@@ -12,8 +12,27 @@ namespace xsd {
 
 typedef std::string string;
 
+// Wrapper for vector to allow specialization for bool
+// std::vector<bool> is specialized and .back() returns a proxy, not a real reference
 template <typename T>
-using vector = std::vector<T>;
+class vector : public std::vector<T>
+{
+public:
+    using std::vector<T>::vector;
+    using std::vector<T>::operator=;
+};
+
+// Specialization for vector<bool> using char storage to avoid proxy issues
+template <>
+class vector<bool> : public std::vector<char>
+{
+public:
+    using std::vector<char>::vector;
+    void push_back(bool value) { std::vector<char>::push_back(value ? 1 : 0); }
+    void emplace_back() { std::vector<char>::emplace_back(0); }
+    bool& back() { return reinterpret_cast<bool&>(std::vector<char>::back()); }
+    const bool& back() const { return reinterpret_cast<const bool&>(std::vector<char>::back()); }
+};
 
 template <typename T>
 class optional
