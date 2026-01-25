@@ -22,7 +22,29 @@ String toCppIdentifier(const String& str)
     }
     if (result.isEmpty() || String::isDigit(*(const char*)result))
         result.prepend("_");
-    if (result == "union" || result == "enum" || result == "linux")
+    // Escape C++ reserved keywords
+    if (result == "union" || result == "enum" || result == "linux" ||
+        result == "bool" || result == "true" || result == "false" ||
+        result == "class" || result == "struct" || result == "int" ||
+        result == "double" || result == "float" || result == "char" ||
+        result == "void" || result == "long" || result == "short" ||
+        result == "signed" || result == "unsigned" || result == "const" ||
+        result == "volatile" || result == "static" || result == "extern" ||
+        result == "register" || result == "auto" || result == "typedef" ||
+        result == "virtual" || result == "explicit" || result == "friend" ||
+        result == "inline" || result == "mutable" || result == "namespace" ||
+        result == "new" || result == "delete" || result == "this" ||
+        result == "operator" || result == "private" || result == "protected" ||
+        result == "public" || result == "template" || result == "typename" ||
+        result == "using" || result == "throw" || result == "try" ||
+        result == "catch" || result == "return" || result == "break" ||
+        result == "continue" || result == "goto" || result == "if" ||
+        result == "else" || result == "switch" || result == "case" ||
+        result == "default" || result == "for" || result == "while" ||
+        result == "do" || result == "sizeof" || result == "alignof" ||
+        result == "decltype" || result == "nullptr" || result == "constexpr" ||
+        result == "noexcept" || result == "override" || result == "final" ||
+        result == "NULL" || result == "TRUE" || result == "FALSE")
         result.append("_");
     return result;
 }
