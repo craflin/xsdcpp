@@ -30,9 +30,9 @@ TEST(Ore, load_portfolio)
 
     EXPECT_EQ(portfolio.Trade.size(), 2);
     EXPECT_EQ(portfolio.Trade[0].id, "trade1");
-    EXPECT_EQ(portfolio.Trade[0].TradeType, "Swap");
+    EXPECT_EQ(portfolio.Trade[0].TradeType, input::oreTradeType::Swap);
     EXPECT_EQ(portfolio.Trade[1].id, "trade2");
-    EXPECT_EQ(portfolio.Trade[1].TradeType, "FxForward");
+    EXPECT_EQ(portfolio.Trade[1].TradeType, input::oreTradeType::FxForward);
 }
 
 TEST(Ore, load_empty_portfolio)
