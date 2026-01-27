@@ -32,6 +32,16 @@ String getXmlAttribute(const Xml::Element& element, const String& name, const St
     return *it;
 }
 
+// Special constant for unbounded occurrences
+const uint UNBOUNDED = 0xFFFFFFFF;
+
+uint parseOccurs(const String& value)
+{
+    if (value == "unbounded")
+        return UNBOUNDED;
+    return value.toUInt();
+}
+
 
 Variant getXmlAttributeVariant(const Xml::Element& element, const String& name, const Variant& defaultValue = Variant())
 {
@@ -129,6 +139,13 @@ private:
     String _path;
     HashMap<Namespace, NamespaceData> _namespaces;
     String _error;
+
+    // Storage for xs:group definitions
+    struct GroupDef
+    {
+        Position position;
+    };
+    HashMap<Xsd::Name, GroupDef> _groups;
 
 private:
 
@@ -391,6 +408,14 @@ private:
         return findXmlElementByNamespaceAndXmlType(position, "http://www.w3.org/2001/XMLSchema", type);
     }
 
+    Position findGroupByName(const Xsd::Name& name)
+    {
+        HashMap<Xsd::Name, GroupDef>::Iterator it = _groups.find(name);
+        if (it != _groups.end())
+            return it->position;
+        return Position();
+    }
+
     bool resolveNamespacePrefix(const Position& position, const String& typeNameWithNamespacePrefix, Xsd::Name& result)
     {
         const char* n = typeNameWithNamespacePrefix.find(':');
@@ -438,7 +463,7 @@ private:
                 getXmlAttribute(*refPos.element, "type").isEmpty())
             {
                 elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
-                elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+                elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
                 elementRef.refName = refName;
                 return true;
             }
@@ -447,7 +472,7 @@ private:
                 return false;
 
             elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
-            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+            elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
             elementRef.refName = refName;
             return true;
         }
@@ -478,7 +503,7 @@ private:
             elementRef.name.name = getXmlAttribute(*position.element, "name");
             elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
             elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
-            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+            elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
 
             // add the type to its substitution group
             String substitutionGroupWithNamespacePrefix = getXmlAttribute(*position.element, "substitutionGroup");
@@ -562,7 +587,7 @@ private:
             elementRef.name.name = getXmlAttribute(*position.element, "name");
             elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
             elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
-            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+            elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
             return true;
         }
 
@@ -751,8 +776,7 @@ private:
 
                     if (!choiceElements.isEmpty())
                     {
-                        uint minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
-                        uint maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
+                        uint choiceMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
 
                         for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                         {
@@ -770,9 +794,78 @@ private:
                             if (exists)
                                 continue;
                             Xsd::ElementRef& elementRef = elements.append(choiceElement);
-                            //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was not actually set in choiceElement?
                             elementRef.minOccurs = 0;
-                            elementRef.maxOccurs = maxOccurs;
+                            // Take the maximum of choice's maxOccurs and element's maxOccurs
+                            if (choiceMaxOccurs == UNBOUNDED || choiceElement.maxOccurs == UNBOUNDED)
+                                elementRef.maxOccurs = UNBOUNDED;
+                            else
+                                elementRef.maxOccurs = choiceMaxOccurs > choiceElement.maxOccurs ? choiceMaxOccurs : choiceElement.maxOccurs;
+                        }
+                    }
+                }
+                else if (compareXsName(position, element.type, "group"))
+                {
+                    // Handle group reference in direct complexType
+                    String refWithNamespacePrefix = getXmlAttribute(element, "ref");
+                    if (!refWithNamespacePrefix.isEmpty())
+                    {
+                        Xsd::Name refName;
+                        if (!resolveNamespacePrefix(position, refWithNamespacePrefix, refName))
+                            return false;
+
+                        Position groupPos = findGroupByName(refName);
+                        if (!groupPos)
+                            return (_error = String::fromPrintf("Could not find group '%s'", (const char*)refName.name)), false;
+
+                        // Process the group's content
+                        for (List<Xml::Variant>::Iterator gi = groupPos.element->content.begin(), gend = groupPos.element->content.end(); gi != gend; ++gi)
+                        {
+                            const Xml::Variant& gvariant = *gi;
+                            if (!gvariant.isElement())
+                                continue;
+                            const Xml::Element& groupChild = gvariant.toElement();
+
+                            Position groupChildPos;
+                            groupChildPos.element = &groupChild;
+                            groupChildPos.xsdFileData = groupPos.xsdFileData;
+
+                            if (compareXsName(groupPos, groupChild.type, "choice") ||
+                                compareXsName(groupPos, groupChild.type, "sequence") ||
+                                compareXsName(groupPos, groupChild.type, "all"))
+                            {
+                                List<Xsd::ElementRef> groupElements;
+                                uint32 groupFlags;
+                                if (!processXsAllEtAl(groupChildPos, typeName, groupElements, groupFlags))
+                                    return false;
+
+                                uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
+                                uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
+
+                                for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
+                                {
+                                    Xsd::ElementRef& groupElem = *gei;
+                                    bool exists = false;
+                                    for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                                    {
+                                        if (j->name.name == groupElem.name.name)
+                                        {
+                                            exists = true;
+                                            break;
+                                        }
+                                    }
+                                    if (exists)
+                                        continue;
+
+                                    Xsd::ElementRef& elementRef = elements.append(groupElem);
+                                    if (groupRefMinOccurs == 0)
+                                        elementRef.minOccurs = 0;
+                                    if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)
+                                        elementRef.maxOccurs = UNBOUNDED;
+                                    else if (groupRefMaxOccurs > 1)
+                                        elementRef.maxOccurs = groupRefMaxOccurs > groupElem.maxOccurs ? groupRefMaxOccurs : groupElem.maxOccurs;
+                                }
+                                flags |= groupFlags;
+                            }
                         }
                     }
                 }
@@ -824,8 +917,7 @@ private:
 
                                         if (!choiceElements.isEmpty())
                                         {
-                                            uint minOccurs = getXmlAttribute(element, "minOccurs", "1").toUInt();
-                                            uint maxOccurs = getXmlAttribute(element, "maxOccurs", "1").toUInt();
+                                            uint choiceMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
 
                                             for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                                             {
@@ -843,9 +935,77 @@ private:
                                                 if (exists)
                                                     continue;
                                                 Xsd::ElementRef& elementRef = elements.append(choiceElement);
-                                                //elementRef.minOccurs = minOccurs;  // todo: skip this if min/max was set actually set in choiceElement?
-                                                elementRef.minOccurs  = 0;
-                                                elementRef.maxOccurs = maxOccurs;
+                                                elementRef.minOccurs = 0;
+                                                // Take the maximum of choice's maxOccurs and element's maxOccurs
+                                                if (choiceMaxOccurs == UNBOUNDED || choiceElement.maxOccurs == UNBOUNDED)
+                                                    elementRef.maxOccurs = UNBOUNDED;
+                                                else
+                                                    elementRef.maxOccurs = choiceMaxOccurs > choiceElement.maxOccurs ? choiceMaxOccurs : choiceElement.maxOccurs;
+                                            }
+                                        }
+                                    }
+                                    else if (compareXsName(position, element.type, "group"))
+                                    {
+                                        // Handle group reference in extension/restriction
+                                        String refWithNamespacePrefix = getXmlAttribute(element, "ref");
+                                        if (!refWithNamespacePrefix.isEmpty())
+                                        {
+                                            Xsd::Name refName;
+                                            if (!resolveNamespacePrefix(position, refWithNamespacePrefix, refName))
+                                                return false;
+
+                                            Position groupPos = findGroupByName(refName);
+                                            if (!groupPos)
+                                                return (_error = String::fromPrintf("Could not find group '%s'", (const char*)refName.name)), false;
+
+                                            for (List<Xml::Variant>::Iterator gi = groupPos.element->content.begin(), gend = groupPos.element->content.end(); gi != gend; ++gi)
+                                            {
+                                                const Xml::Variant& gvariant = *gi;
+                                                if (!gvariant.isElement())
+                                                    continue;
+                                                const Xml::Element& groupChild = gvariant.toElement();
+
+                                                Position groupChildPos;
+                                                groupChildPos.element = &groupChild;
+                                                groupChildPos.xsdFileData = groupPos.xsdFileData;
+
+                                                if (compareXsName(groupPos, groupChild.type, "choice") ||
+                                                    compareXsName(groupPos, groupChild.type, "sequence") ||
+                                                    compareXsName(groupPos, groupChild.type, "all"))
+                                                {
+                                                    List<Xsd::ElementRef> groupElements;
+                                                    uint32 groupFlags;
+                                                    if (!processXsAllEtAl(groupChildPos, typeName, groupElements, groupFlags))
+                                                        return false;
+
+                                                    uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
+                                                    uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
+
+                                                    for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
+                                                    {
+                                                        Xsd::ElementRef& groupElem = *gei;
+                                                        bool exists = false;
+                                                        for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                                                        {
+                                                            if (j->name.name == groupElem.name.name)
+                                                            {
+                                                                exists = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                        if (exists)
+                                                            continue;
+
+                                                        Xsd::ElementRef& elementRef = elements.append(groupElem);
+                                                        if (groupRefMinOccurs == 0)
+                                                            elementRef.minOccurs = 0;
+                                                        if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)
+                                                            elementRef.maxOccurs = UNBOUNDED;
+                                                        else if (groupRefMaxOccurs > 1)
+                                                            elementRef.maxOccurs = groupRefMaxOccurs > groupElem.maxOccurs ? groupRefMaxOccurs : groupElem.maxOccurs;
+                                                    }
+                                                    flags |= groupFlags;
+                                                }
                                             }
                                         }
                                     }
@@ -1032,8 +1192,7 @@ private:
 
                 if (!choiceElements.isEmpty())
                 {
-                    uint minOccurs = getXmlAttribute(element, "minOccurs", getXmlAttribute(*position.element, "minOccurs", "1")).toUInt();
-                    uint maxOccurs = getXmlAttribute(element, "maxOccurs", getXmlAttribute(*position.element, "maxOccurs", "1")).toUInt();
+                    uint choiceMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", getXmlAttribute(*position.element, "maxOccurs", "1")));
 
                     for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                     {
@@ -1051,9 +1210,83 @@ private:
                         if (exists)
                             continue;
                         Xsd::ElementRef& elementRef = elements.append(choiceElement);
-                        //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was set actually set in choiceElement?
                         elementRef.minOccurs = 0;
-                        elementRef.maxOccurs = maxOccurs;
+                        // Take the maximum of choice's maxOccurs and element's maxOccurs
+                        // Either being unbounded means the result is unbounded
+                        if (choiceMaxOccurs == UNBOUNDED || choiceElement.maxOccurs == UNBOUNDED)
+                            elementRef.maxOccurs = UNBOUNDED;
+                        else
+                            elementRef.maxOccurs = choiceMaxOccurs > choiceElement.maxOccurs ? choiceMaxOccurs : choiceElement.maxOccurs;
+                    }
+                }
+            }
+            else if (compareXsName(position, element.type, "group"))
+            {
+                // Handle group reference
+                String refWithNamespacePrefix = getXmlAttribute(element, "ref");
+                if (!refWithNamespacePrefix.isEmpty())
+                {
+                    Xsd::Name refName;
+                    if (!resolveNamespacePrefix(position, refWithNamespacePrefix, refName))
+                        return false;
+
+                    Position groupPos = findGroupByName(refName);
+                    if (!groupPos)
+                        return (_error = String::fromPrintf("Could not find group '%s'", (const char*)refName.name)), false;
+
+                    // Process the group's content (choice, sequence, or all)
+                    for (List<Xml::Variant>::Iterator gi = groupPos.element->content.begin(), gend = groupPos.element->content.end(); gi != gend; ++gi)
+                    {
+                        const Xml::Variant& gvariant = *gi;
+                        if (!gvariant.isElement())
+                            continue;
+                        const Xml::Element& groupChild = gvariant.toElement();
+
+                        Position groupChildPos;
+                        groupChildPos.element = &groupChild;
+                        groupChildPos.xsdFileData = groupPos.xsdFileData;
+
+                        if (compareXsName(groupPos, groupChild.type, "choice") ||
+                            compareXsName(groupPos, groupChild.type, "sequence") ||
+                            compareXsName(groupPos, groupChild.type, "all"))
+                        {
+                            List<Xsd::ElementRef> groupElements;
+                            uint32 groupFlags;
+                            if (!processXsAllEtAl(groupChildPos, parentTypeName, groupElements, groupFlags))
+                                return false;
+
+                            uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
+                            uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
+
+                            // Add elements from the group, adjusting occurrences
+                            for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
+                            {
+                                Xsd::ElementRef& groupElem = *gei;
+                                // Skip if an element with the same name already exists
+                                bool exists = false;
+                                for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                                {
+                                    if (j->name.name == groupElem.name.name)
+                                    {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                                if (exists)
+                                    continue;
+
+                                Xsd::ElementRef& elementRef = elements.append(groupElem);
+                                // If the group ref is optional, make all elements optional
+                                if (groupRefMinOccurs == 0)
+                                    elementRef.minOccurs = 0;
+                                // Propagate maxOccurs from group ref
+                                if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)
+                                    elementRef.maxOccurs = UNBOUNDED;
+                                else if (groupRefMaxOccurs > 1)
+                                    elementRef.maxOccurs = groupRefMaxOccurs > groupElem.maxOccurs ? groupRefMaxOccurs : groupElem.maxOccurs;
+                            }
+                            flags |= groupFlags;
+                        }
                     }
                 }
             }
@@ -1080,6 +1313,59 @@ private:
 
     bool process(List<Xsd::ElementRef>& elements)
     {
+        // First pass: collect group definitions and substitution group members
+        for (HashMap<String, NamespaceData>::Iterator i = _namespaces.begin(), end = _namespaces.end(); i != end; ++i)
+        {
+            NamespaceData& namespaceData = *i;
+            for (HashMap<String, XsdFileData>::Iterator i = namespaceData.files.begin(), end = namespaceData.files.end(); i != end; ++i)
+            {
+                const XsdFileData& xsdFileData = *i;
+                Position position;
+                position.element = &xsdFileData.xsd;
+                position.xsdFileData = &xsdFileData;
+
+                for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
+                {
+                    const Xml::Variant& variant = *i;
+                    if (!variant.isElement())
+                        continue;
+                    const Xml::Element& element = variant.toElement();
+
+                    // Collect group definitions
+                    if (compareXsName(position, element.type, "group"))
+                    {
+                        String name = getXmlAttribute(element, "name");
+                        if (!name.isEmpty())
+                        {
+                            Xsd::Name groupName;
+                            groupName.name = name;
+                            groupName.xsdNamespace = xsdFileData.targetNamespace;
+
+                            GroupDef& groupDef = _groups.append(groupName, GroupDef());
+                            groupDef.position.element = &element;
+                            groupDef.position.xsdFileData = &xsdFileData;
+                        }
+                    }
+                    // Process elements with substitutionGroup to register them
+                    else if (compareXsName(position, element.type, "element"))
+                    {
+                        String substitutionGroupAttr = getXmlAttribute(element, "substitutionGroup");
+                        if (!substitutionGroupAttr.isEmpty())
+                        {
+                            Position elementPosition;
+                            elementPosition.element = &element;
+                            elementPosition.xsdFileData = position.xsdFileData;
+
+                            Xsd::ElementRef elementRef;
+                            if (!processXsElement(elementPosition, Xsd::Name(), elementRef, false))
+                                return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Second pass: collect root elements
         for (HashMap<String, NamespaceData>::Iterator i = _namespaces.begin(), end = _namespaces.end(); i != end; ++i)
         {
             NamespaceData& namespaceData = *i;

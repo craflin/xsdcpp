@@ -1,6 +1,7 @@
 
 #include <string>
 #include <cstdint>
+#include <vector>
 
 namespace xsdcpp {
 
@@ -58,7 +59,7 @@ struct ElementContext
 {
     const ElementInfo* info;
     void* element;
-    size_t processedElements2[64];
+    std::vector<size_t> processedElements2;
     uint64_t processedAttributes2;
 
     ElementContext(const ElementInfo* info, void* element);
