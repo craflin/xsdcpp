@@ -694,6 +694,24 @@ private:
 
                     if (!enumEntries.isEmpty())
                     {
+                        // If a type with this name already exists as an enum (e.g. multiple
+                        // anonymous attributes share the same generated name like "type_t"),
+                        // merge the new values into the existing enum rather than overwriting.
+                        HashMap<Xsd::Name, Xsd::Type>::Iterator existingIt = _output.types.find(typeName);
+                        if (existingIt != _output.types.end() && existingIt->kind == Xsd::Type::EnumKind)
+                        {
+                            for (List<String>::Iterator ei = enumEntries.begin(), eend = enumEntries.end(); ei != eend; ++ei)
+                            {
+                                bool found = false;
+                                for (List<String>::Iterator ej = existingIt->enumEntries.begin(), ejend = existingIt->enumEntries.end(); ej != ejend; ++ej)
+                                {
+                                    if (*ej == *ei) { found = true; break; }
+                                }
+                                if (!found)
+                                    existingIt->enumEntries.append(*ei);
+                            }
+                            return true;
+                        }
                         Xsd::Type& type = _output.types.append(typeName, Xsd::Type());
                         type.kind = Xsd::Type::EnumKind;
                         type.enumEntries.swap(enumEntries);
@@ -883,6 +901,10 @@ private:
                                 uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
                                 uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
 
+                                // Choice elements are mutually exclusive alternatives — each is
+                                // individually optional regardless of the outer group ref's minOccurs.
+                                bool groupIsChoice = compareXsName(groupPos, groupChild.type, "choice");
+
                                 for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
                                 {
                                     Xsd::ElementRef& groupElem = *gei;
@@ -899,7 +921,7 @@ private:
                                         continue;
 
                                     Xsd::ElementRef& elementRef = elements.append(groupElem);
-                                    if (groupRefMinOccurs == 0)
+                                    if (groupIsChoice || groupRefMinOccurs == 0)
                                         elementRef.minOccurs = 0;
                                     if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)
                                         elementRef.maxOccurs = UNBOUNDED;
@@ -1023,6 +1045,9 @@ private:
                                                     uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
                                                     uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
 
+                                                    // Choice elements are mutually exclusive alternatives.
+                                                    bool groupIsChoice = compareXsName(groupPos, groupChild.type, "choice");
+
                                                     for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
                                                     {
                                                         Xsd::ElementRef& groupElem = *gei;
@@ -1039,7 +1064,7 @@ private:
                                                             continue;
 
                                                         Xsd::ElementRef& elementRef = elements.append(groupElem);
-                                                        if (groupRefMinOccurs == 0)
+                                                        if (groupIsChoice || groupRefMinOccurs == 0)
                                                             elementRef.minOccurs = 0;
                                                         if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)
                                                             elementRef.maxOccurs = UNBOUNDED;
@@ -1300,6 +1325,11 @@ private:
                             uint groupRefMinOccurs = parseOccurs(getXmlAttribute(element, "minOccurs", "1"));
                             uint groupRefMaxOccurs = parseOccurs(getXmlAttribute(element, "maxOccurs", "1"));
 
+                            // When a group's content is a <xs:choice>, elements are mutually
+                            // exclusive alternatives.  Each individual element is therefore
+                            // optional (minOccurs=0) regardless of the group ref's minOccurs.
+                            bool groupIsChoice = compareXsName(groupPos, groupChild.type, "choice");
+
                             // Add elements from the group, adjusting occurrences
                             for (List<Xsd::ElementRef>::Iterator gei = groupElements.begin(), geend = groupElements.end(); gei != geend; ++gei)
                             {
@@ -1318,8 +1348,9 @@ private:
                                     continue;
 
                                 Xsd::ElementRef& elementRef = elements.append(groupElem);
-                                // If the group ref is optional, make all elements optional
-                                if (groupRefMinOccurs == 0)
+                                // Choice elements are alternatives so each is individually optional.
+                                // Also make all elements optional when the group ref itself is optional.
+                                if (groupIsChoice || groupRefMinOccurs == 0)
                                     elementRef.minOccurs = 0;
                                 // Propagate maxOccurs from group ref
                                 if (groupRefMaxOccurs == UNBOUNDED || groupElem.maxOccurs == UNBOUNDED)

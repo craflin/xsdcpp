@@ -587,13 +587,13 @@ private:
 
     ReadTextMode getReadTextMode(const Xsd::Name& typeName) const
     {
+        // xs:any content (SkipProcessContentsFlag) applies to all type kinds,
+        // not just strings. Check this before the kind-specific logic.
+        if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
+            return SkipProcessingMode;
         Xsd::Type rootType = getType(getRootTypeName(typeName));
         if (rootType.kind == Xsd::Type::Kind::StringKind)
-        {
-            if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
-                return SkipProcessingMode;
             return ReadAndProcessTextMode;
-        }
         if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind || rootType.kind == Xsd::Type::Kind::ListKind)
             return ReadAndProcessTextMode;
         return SkipMode;
@@ -866,7 +866,20 @@ private:
         }
         flags.append("xsdcpp::ElementInfo::ReadTextFlag");
         if (readTextMode == SkipProcessingMode)
+        {
             flags.append("xsdcpp::ElementInfo::SkipProcessingFlag");
+            // For complex types with xs:any, there is no field to write text into.
+            // The content is skipped; addText is nullptr (guarded in XmlParser).
+            Xsd::Type rootType2 = getType(getRootTypeName(typeName));
+            if (rootType2.kind != Xsd::Type::Kind::StringKind &&
+                rootType2.kind != Xsd::Type::Kind::BaseKind &&
+                rootType2.kind != Xsd::Type::Kind::EnumKind &&
+                rootType2.kind != Xsd::Type::Kind::ListKind)
+            {
+                addTextFunction = "nullptr";
+                return true;
+            }
+        }
 
         if (!generateTypeSetter(typeName))
             return false;
