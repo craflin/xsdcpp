@@ -594,7 +594,7 @@ private:
         Xsd::Type rootType = getType(getRootTypeName(typeName));
         if (rootType.kind == Xsd::Type::Kind::StringKind)
             return ReadAndProcessTextMode;
-        if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind || rootType.kind == Xsd::Type::Kind::ListKind)
+        if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind || rootType.kind == Xsd::Type::Kind::ListKind || rootType.kind == Xsd::Type::Kind::UnionKind)
             return ReadAndProcessTextMode;
         return SkipMode;
     }
@@ -874,7 +874,8 @@ private:
             if (rootType2.kind != Xsd::Type::Kind::StringKind &&
                 rootType2.kind != Xsd::Type::Kind::BaseKind &&
                 rootType2.kind != Xsd::Type::Kind::EnumKind &&
-                rootType2.kind != Xsd::Type::Kind::ListKind)
+                rootType2.kind != Xsd::Type::Kind::ListKind &&
+                rootType2.kind != Xsd::Type::Kind::UnionKind)
             {
                 addTextFunction = "nullptr";
                 return true;
