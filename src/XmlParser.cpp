@@ -26,6 +26,25 @@ struct Position
 
 namespace {
 
+// Support for xs:any child elements: a static capture target and its ElementInfo.
+// When enterElement encounters an unknown child element inside a parent that has
+// AnyElementFlag, it returns a context pointing here so that the text content of
+// the unknown element is captured into g_any_element_capture. After checkElement,
+// parseElement calls the parent's setOtherElement callback.
+static thread_local std::string g_any_element_capture;
+
+static void _capture_any_element_text(std::string* s, const xsdcpp::Position&,
+                                       std::string&& val)
+{
+    *s = std::move(val);
+}
+
+static const xsdcpp::ElementInfo g_any_element_info = {
+    xsdcpp::ElementInfo::ReadTextFlag,
+    (xsdcpp::set_value_t)&_capture_any_element_text,
+    nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr
+};
+
 struct Token
 {
     enum Type
@@ -447,6 +466,13 @@ xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& pa
                     if (nameWithoutNamespace == c->name)
                         return enterElement(context, parentElementContext, *c);
     }
+    // Support xs:any: if the parent declares AnyElementFlag, capture as any_element.
+    for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+        if (i->flags & xsdcpp::ElementInfo::AnyElementFlag)
+        {
+            g_any_element_capture.clear();
+            return xsdcpp::ElementContext(&g_any_element_info, &g_any_element_capture);
+        }
     throw VerificationException(context.pos, "Unexpected element '" + name + "'");
 }
 
@@ -597,6 +623,17 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
     if (context.token.type != Token::tagEndType)
         throw SyntaxException(context.token.pos, "Expected '>'");
     checkElement(context, elementContext);
+
+    // If this was an xs:any capture, notify the parent via setOtherElement.
+    if (elementContext.info == &g_any_element_info)
+        for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+            if (i->setOtherElement)
+            {
+                i->setOtherElement(parentElementContext.element,
+                                   std::move(elementName),
+                                   std::move(g_any_element_capture));
+                break;
+            }
 }
 
 }

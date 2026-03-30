@@ -75,6 +75,7 @@ struct Xsd
         {
             SkipProcessContentsFlag = 1,
             AnyAttributeFlag = 2,
+            AnyElementFlag = 4,
         };
         uint32 flags;
         List<AttributeRef> attributes;
