@@ -332,6 +332,11 @@ public:
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputAnonymousFieldGetter);
         _cppOutputFinal.append("");
+        // Output forward declarations for serialize functions first
+        _cppOutputFinal.append("// Serialize function forward declarations");
+        _cppOutputFinal.append(_cppOutputAnonymousSerializeDecl);
+        _cppOutputFinal.append("");
+        // Then output implementations
         _cppOutputFinal.append(_cppOutputAnonymousSerialize);
         _cppOutputFinal.append("");
         _cppOutputFinal.append("}");
@@ -397,7 +402,8 @@ private:
     List<String> _cppOutputAnonymousEnumValues;
     List<String> _cppOutputNamespaceSetValue;
     List<String> _cppOutputAnonymousFieldGetter;
-    List<String> _cppOutputAnonymousSerialize;
+    List<String> _cppOutputAnonymousSerializeDecl;  // Forward declarations
+    List<String> _cppOutputAnonymousSerialize;       // Implementations
     List<String> _cppOutputNamespace;
     List<String>& _hppOutput;
     String _cppNamespace;
@@ -1421,6 +1427,7 @@ private:
             if (!_generatedPrimitiveSerializers.contains(cppName))
             {
                 _generatedPrimitiveSerializers.append(cppName);
+                _cppOutputAnonymousSerializeDecl.append("void _serialize_xsd__string(xsdcpp::XmlWriter& w, const char* name, const xsd::string& v);");
                 _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_xsd__string(xsdcpp::XmlWriter& w, const char* name, const xsd::string& v) {"));
                 _cppOutputAnonymousSerialize.append("    w.startElement(name);");
                 _cppOutputAnonymousSerialize.append("    w.writeText(v);");
@@ -1437,6 +1444,7 @@ private:
             if (!_generatedPrimitiveSerializers.contains(cppName))
             {
                 _generatedPrimitiveSerializers.append(cppName);
+                _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, " + cppName + " v);");
                 _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, " + cppName + " v) {");
                 _cppOutputAnonymousSerialize.append("    w.startElement(name);");
                 _cppOutputAnonymousSerialize.append(String("    w.writeText(xsdcpp::get_string(v));"));
@@ -1449,6 +1457,9 @@ private:
 
         if (type.kind == Xsd::Type::SubstitutionGroupKind)
         {
+            // Add forward declaration
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char*, const " + cppNameWithNamespace + "& v);");
+
             // First generate serialize functions for child types (before opening parent function)
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
@@ -1473,7 +1484,8 @@ private:
 
         if (type.kind == Xsd::Type::EnumKind)
         {
-            // Enum is serialized as text using to_string
+            // Forward declaration and implementation for enum
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
             _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
             _cppOutputAnonymousSerialize.append("    w.startElement(name);");
             _cppOutputAnonymousSerialize.append(String("    w.writeText(") + toCppNamespacePrefix(typeName) + "::to_string(v));");
@@ -1485,7 +1497,8 @@ private:
 
         if (type.kind == Xsd::Type::StringKind || type.kind == Xsd::Type::UnionKind)
         {
-            // String types are serialized as text
+            // Forward declaration and implementation for string types
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
             _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
             _cppOutputAnonymousSerialize.append("    w.startElement(name);");
             _cppOutputAnonymousSerialize.append("    w.writeText(v);");
@@ -1497,7 +1510,8 @@ private:
 
         if (type.kind == Xsd::Type::ListKind)
         {
-            // List is serialized as space-separated values
+            // Forward declaration and implementation for list types
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
             String itemCppName = toCppTypeIdentifier2(type.baseType);
             Xsd::Type itemType = getType(type.baseType);
             String itemSerializer = (itemType.kind == Xsd::Type::EnumKind)
@@ -1519,6 +1533,8 @@ private:
 
         if (type.kind == Xsd::Type::SimpleRefKind)
         {
+            // Forward declaration
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
             // SimpleRef is a typedef - delegate to base type
             if (!generateSerializeFunction(type.baseType))
                 return false;
@@ -1532,6 +1548,9 @@ private:
 
         if (type.kind == Xsd::Type::ElementKind)
         {
+            // Add forward declaration first
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+
             // Generate serialize for base type first if it exists
             if (!type.baseType.name.isEmpty())
             {

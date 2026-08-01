@@ -9,9 +9,9 @@ namespace xsdcpp {
 ElementContext::ElementContext(const ElementInfo* info, void* element)
     : info(info)
     , element(element)
+    , processedElements2(info->childrenCount, 0)
     , processedAttributes2(0)
 {
-    memset(processedElements2, 0, sizeof(size_t) * info->childrenCount);
 }
 
 struct Position
