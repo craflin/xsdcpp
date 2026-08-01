@@ -539,7 +539,7 @@ private:
                     return true;
                 }
             }
-            return (_error = String::fromPrintf("Could not find 'element', 'complexType' or 'simpleType' in '%s'", (const char*)position.element->type)), false;
+            return (_error = String::fromPrintf("Could not find 'element', 'complexType' or 'simpleType' in '%s' (name='%s')", (const char*)position.element->type, (const char*)name)), false;
         }
 
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
