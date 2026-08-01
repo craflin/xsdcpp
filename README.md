@@ -74,7 +74,7 @@ xsdcpp [<xsd-file>] [options]
 | `-C <dir>`, `--cpp-output=<dir>`    | The folder in which the implementation files (.cpp) are created. Overrides `-o` for implementation files.                                                                                                                                                                   |
 | `-n <name>`, `--name=<name>`        | The namespace used for the generated data model and base name of the output files. The default is derived from the XSD filename.                                                                                                                                            |
 | `-w <ns>`, `--wrap-namespace=<ns>`  | Wrap all generated code in an additional C++ namespace. Supports nested namespaces using `::` syntax (e.g., `a::b::c`).                                                                                                                                                     |
-| `-N`, `--no-inner-namespace`        | Skip generating the inner namespace (derived from `--name` or schema filename). Types will be placed directly in the wrap namespace.                                                                                                                                        |
+| `-P <prefix>`, `--include-prefix=<prefix>` | Prefix for `#include` directives in generated `.cpp` files. Use when headers are in a different directory structure than sources.                                                                                                                              |
 | `-e <ns>`, `--extern=<ns>`          | A namespace that should not be generated in the output files and hence must be provided separately. Use this to avoid code duplication if you have a schema that is the base for multiple other schemas. Set to `xsdcpp` to omit the generation of the core parser library. |
 | `-t <type>`, `--type=<type>`        | Enforce the generation of a type that is not directly referenced from a root element. Can be specified multiple times.                                                                                                                                                      |
 
@@ -96,11 +96,11 @@ xsdcpp Example.xsd -o out/ -w myproject::xml
 ```
 This generates types like `myproject::xml::Example::Person`.
 
-Skip the inner namespace to place types directly in the wrap namespace:
+Rename the inner namespace and wrap in an outer namespace:
 ```
-xsdcpp Example.xsd -o out/ -w myproject::xml -N
+xsdcpp Example.xsd -o out/ -w myproject::xml -n types
 ```
-This generates types like `myproject::xml::Person`.
+This generates types like `myproject::xml::types::Person`.
 
 ## Example
 
@@ -201,10 +201,12 @@ struct Country : xsd::base<Example::CountryCode>
 
 }
 ```
-And functions to load an XML file or XML data from a string:
+And functions to load and save XML:
 ```cpp
-void load_file(const std::string& file, List& List);
-void load_data(const std::string& data, List& List);
+void load_file(const std::string& file, List& list);
+void load_data(const std::string& data, List& list);
+void save_file(const std::string& file, const List& list);
+std::string save_data(const List& list);
 ```
 (The implementation of these functions can be found in *Example.cpp* and *Example_xsd.hpp* provides the types of the *xsd* namespace.)
 

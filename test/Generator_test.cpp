@@ -14,7 +14,7 @@ TEST(Generator, generateCpp)
         Xsd xsd;
         EXPECT_TRUE(Directory::create("test_temp"));
         EXPECT_TRUE(readXsd(String(), inputFile, List<String>(), xsd, error));
-        EXPECT_TRUE(generateCpp(xsd, "test_temp", "test_temp", List<String>(), List<String>(), String(), false, error));
+        EXPECT_TRUE(generateCpp(xsd, "test_temp", "test_temp", List<String>(), List<String>(), String(), String(), error));
     }
     {
         String inputFile = FOLDER "/SubstitutionGroup.xsd";
@@ -22,6 +22,6 @@ TEST(Generator, generateCpp)
         Xsd xsd;
         EXPECT_TRUE(Directory::create("test_temp"));
         EXPECT_TRUE(readXsd(String(), inputFile, List<String>(), xsd, error));
-        EXPECT_TRUE(generateCpp(xsd, "test_temp", "test_temp", List<String>(), List<String>(), String(), false, error));
+        EXPECT_TRUE(generateCpp(xsd, "test_temp", "test_temp", List<String>(), List<String>(), String(), String(), error));
     }
 }
