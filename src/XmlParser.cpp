@@ -159,6 +159,37 @@ void skipText(xsdcpp::Position& pos)
         default:
             if (pos.pos[1] == '!')
             {
+                if (strncmp(pos.pos + 2, "[CDATA[", 7) == 0)
+                {
+                    pos.pos += 9; // skip past "<![CDATA["
+                    for (;;)
+                    {
+                        const char* e = strpbrk(pos.pos, "]\r\n");
+                        if (!e)
+                        {
+                            pos.pos += strlen(pos.pos);
+                            throw SyntaxException(pos, "Unexpected end of file in CDATA section");
+                        }
+                        pos.pos = e;
+                        if (*pos.pos == '\r')
+                        {
+                            if (*++pos.pos == '\n') ++pos.pos;
+                            ++pos.line; pos.lineStart = pos.pos;
+                        }
+                        else if (*pos.pos == '\n')
+                        {
+                            ++pos.line; ++pos.pos; pos.lineStart = pos.pos;
+                        }
+                        else if (strncmp(pos.pos, "]]>", 3) == 0)
+                        {
+                            pos.pos += 3;
+                            break;
+                        }
+                        else
+                            ++pos.pos;
+                    }
+                    continue;
+                }
                 skipSpace(pos);
                 continue;
             }
@@ -259,6 +290,16 @@ std::string stripComments(const char* str, size_t len)
         else
             result.append(i, next - i);
         i = next;
+        if (strncmp(i + 1, "![CDATA[", 8) == 0)
+        {
+            i += 9; // skip "<![CDATA["
+            const char* cdataEnd = strstr(i, "]]>");
+            if (!cdataEnd)
+                return result.append(i, end - i); // malformed, include remainder
+            result.append(i, cdataEnd - i);       // extract CDATA content
+            i = cdataEnd + 3;                     // skip "]]>"
+            continue;
+        }
         if (strncmp(i + 1, "!--", 3) != 0)
             return result.append(i, end - i);
         i += 4;
@@ -527,7 +568,7 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
                 skipTextAndSubElements(context, elementName);
             else
                 skipText(context.pos);
-            if (context.pos.pos != start)
+            if (context.pos.pos != start && elementContext.info->addText)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
                 elementContext.info->addText(elementContext.element, context.pos, std::move(text));
