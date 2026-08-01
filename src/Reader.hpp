@@ -6,6 +6,9 @@
 #include <nstd/HashSet.hpp>
 #include <nstd/Variant.hpp>
 
+// Special constant for unbounded maxOccurs
+const uint XSD_UNBOUNDED = 0xFFFFFFFF;
+
 struct Xsd
 {
     struct Name
@@ -72,6 +75,7 @@ struct Xsd
         {
             SkipProcessContentsFlag = 1,
             AnyAttributeFlag = 2,
+            AnyElementFlag = 4,
         };
         uint32 flags;
         List<AttributeRef> attributes;

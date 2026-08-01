@@ -9,9 +9,9 @@ namespace xsdcpp {
 ElementContext::ElementContext(const ElementInfo* info, void* element)
     : info(info)
     , element(element)
+    , processedElements2(info->childrenCount, 0)
     , processedAttributes2(0)
 {
-    memset(processedElements2, 0, sizeof(size_t) * info->childrenCount);
 }
 
 struct Position
@@ -25,6 +25,25 @@ struct Position
 
 
 namespace {
+
+// Support for xs:any child elements: a static capture target and its ElementInfo.
+// When enterElement encounters an unknown child element inside a parent that has
+// AnyElementFlag, it returns a context pointing here so that the text content of
+// the unknown element is captured into g_any_element_capture. After checkElement,
+// parseElement calls the parent's setOtherElement callback.
+static thread_local std::string g_any_element_capture;
+
+static void _capture_any_element_text(std::string* s, const xsdcpp::Position&,
+                                       std::string&& val)
+{
+    *s = std::move(val);
+}
+
+static const xsdcpp::ElementInfo g_any_element_info = {
+    xsdcpp::ElementInfo::ReadTextFlag,
+    (xsdcpp::set_value_t)&_capture_any_element_text,
+    nullptr, 0, nullptr, 0, nullptr, nullptr, nullptr
+};
 
 struct Token
 {
@@ -159,6 +178,37 @@ void skipText(xsdcpp::Position& pos)
         default:
             if (pos.pos[1] == '!')
             {
+                if (strncmp(pos.pos + 2, "[CDATA[", 7) == 0)
+                {
+                    pos.pos += 9; // skip past "<![CDATA["
+                    for (;;)
+                    {
+                        const char* e = strpbrk(pos.pos, "]\r\n");
+                        if (!e)
+                        {
+                            pos.pos += strlen(pos.pos);
+                            throw SyntaxException(pos, "Unexpected end of file in CDATA section");
+                        }
+                        pos.pos = e;
+                        if (*pos.pos == '\r')
+                        {
+                            if (*++pos.pos == '\n') ++pos.pos;
+                            ++pos.line; pos.lineStart = pos.pos;
+                        }
+                        else if (*pos.pos == '\n')
+                        {
+                            ++pos.line; ++pos.pos; pos.lineStart = pos.pos;
+                        }
+                        else if (strncmp(pos.pos, "]]>", 3) == 0)
+                        {
+                            pos.pos += 3;
+                            break;
+                        }
+                        else
+                            ++pos.pos;
+                    }
+                    continue;
+                }
                 skipSpace(pos);
                 continue;
             }
@@ -259,6 +309,16 @@ std::string stripComments(const char* str, size_t len)
         else
             result.append(i, next - i);
         i = next;
+        if (strncmp(i + 1, "![CDATA[", 8) == 0)
+        {
+            i += 9; // skip "<![CDATA["
+            const char* cdataEnd = strstr(i, "]]>");
+            if (!cdataEnd)
+                return result.append(i, end - i); // malformed, include remainder
+            result.append(i, cdataEnd - i);       // extract CDATA content
+            i = cdataEnd + 3;                     // skip "]]>"
+            continue;
+        }
         if (strncmp(i + 1, "!--", 3) != 0)
             return result.append(i, end - i);
         i += 4;
@@ -406,6 +466,13 @@ xsdcpp::ElementContext enterElement(Context& context, xsdcpp::ElementContext& pa
                     if (nameWithoutNamespace == c->name)
                         return enterElement(context, parentElementContext, *c);
     }
+    // Support xs:any: if the parent declares AnyElementFlag, capture as any_element.
+    for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+        if (i->flags & xsdcpp::ElementInfo::AnyElementFlag)
+        {
+            g_any_element_capture.clear();
+            return xsdcpp::ElementContext(&g_any_element_info, &g_any_element_capture);
+        }
     throw VerificationException(context.pos, "Unexpected element '" + name + "'");
 }
 
@@ -527,7 +594,7 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
                 skipTextAndSubElements(context, elementName);
             else
                 skipText(context.pos);
-            if (context.pos.pos != start)
+            if (context.pos.pos != start && elementContext.info->addText)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
                 elementContext.info->addText(elementContext.element, context.pos, std::move(text));
@@ -556,6 +623,17 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
     if (context.token.type != Token::tagEndType)
         throw SyntaxException(context.token.pos, "Expected '>'");
     checkElement(context, elementContext);
+
+    // If this was an xs:any capture, notify the parent via setOtherElement.
+    if (elementContext.info == &g_any_element_info)
+        for (const xsdcpp::ElementInfo* i = parentElementContext.info; i; i = i->base)
+            if (i->setOtherElement)
+            {
+                i->setOtherElement(parentElementContext.element,
+                                   std::move(elementName),
+                                   std::move(g_any_element_capture));
+                break;
+            }
 }
 
 }

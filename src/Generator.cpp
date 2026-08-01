@@ -11,6 +11,51 @@
 
 namespace {
 
+// Split a namespace string like "a::b::c" into individual parts
+List<String> splitNamespace(const String& ns)
+{
+    List<String> parts;
+    if (ns.isEmpty())
+        return parts;
+
+    const char* base = (const char*)ns;
+    const char* start = base;
+    for (;;)
+    {
+        const char* pos = String::find(start, "::");
+        if (!pos)
+        {
+            // Remaining part after last ::
+            parts.append(ns.substr(start - base));
+            break;
+        }
+        // Part between start and pos
+        parts.append(ns.substr(start - base, pos - start));
+        start = pos + 2;
+    }
+    return parts;
+}
+
+// Generate opening namespace declarations for C++11 (one per line)
+String generateNamespaceOpen(const String& ns)
+{
+    List<String> parts = splitNamespace(ns);
+    String result;
+    for (List<String>::Iterator i = parts.begin(), end = parts.end(); i != end; ++i)
+        result += String("namespace ") + *i + " {\n";
+    return result;
+}
+
+// Generate closing braces for namespace (one per line)
+String generateNamespaceClose(const String& ns)
+{
+    List<String> parts = splitNamespace(ns);
+    String result;
+    for (List<String>::Iterator i = parts.begin(), end = parts.end(); i != end; ++i)
+        result += "}\n";
+    return result;
+}
+
 HashSet<String> loadCppKeywords()
 {
     HashSet<String> keywords(100);
@@ -126,11 +171,12 @@ bool compareXsName(const Xsd::Name& name, const String& rh)
 class Generator
 {
 public:
-    Generator(const Xsd& xsd, const List<String>& externalNamespacePrefixes, const List<String>& forceTypeProcessing, List<String>& cppOutput, List<String>& hppOutput)
+    Generator(const Xsd& xsd, const List<String>& externalNamespacePrefixes, const List<String>& forceTypeProcessing, List<String>& cppOutput, List<String>& hppOutput, const String& includePrefix)
         : _xsd(xsd)
         , _externalNamespacePrefixes(externalNamespacePrefixes)
         , _cppOutputFinal(cppOutput)
         , _hppOutput(hppOutput)
+        , _includePrefix(includePrefix)
     {
         for (List<String>::Iterator i = forceTypeProcessing.begin(), end = forceTypeProcessing.end(); i != end; ++i)
         {
@@ -168,7 +214,10 @@ public:
             return false;
 
         _cppOutputFinal.append("");
-        _cppOutputFinal.append(String("#include \"") + _cppNamespace + ".hpp\"");
+        if (_includePrefix.isEmpty())
+            _cppOutputFinal.append(String("#include \"") + _cppNamespace + ".hpp\"");
+        else
+            _cppOutputFinal.append(String("#include \"") + _includePrefix + "/" + _cppNamespace + ".hpp\"");
         _cppOutputFinal.append("");
 
         for (HashMap<String, HashSet<Xsd::Name>>::Iterator i = externalTypes.begin(), end = externalTypes.end(); i != end; ++i)
@@ -251,6 +300,8 @@ public:
 
             _hppOutput.append(String("void load_file(const std::string& file, ") + elementTypeCppName + "& " + elementCppName + ");");
             _hppOutput.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& " + elementCppName + ");");
+            _hppOutput.append(String("void save_file(const std::string& file, const ") + elementTypeCppName + "& " + elementCppName + ");");
+            _hppOutput.append(String("std::string save_data(const ") + elementTypeCppName + "& " + elementCppName + ");");
             _hppOutput.append("");
         }
 
@@ -281,6 +332,13 @@ public:
         _cppOutputFinal.append("");
         _cppOutputFinal.append(_cppOutputAnonymousFieldGetter);
         _cppOutputFinal.append("");
+        // Output forward declarations for serialize functions first
+        _cppOutputFinal.append("// Serialize function forward declarations");
+        _cppOutputFinal.append(_cppOutputAnonymousSerializeDecl);
+        _cppOutputFinal.append("");
+        // Then output implementations
+        _cppOutputFinal.append(_cppOutputAnonymousSerialize);
+        _cppOutputFinal.append("");
         _cppOutputFinal.append("}");
         _cppOutputFinal.append("");
 
@@ -309,6 +367,20 @@ public:
             _cppOutputFinal.append("    load_data(xsdcpp::read_file(filePath), output);");
             _cppOutputFinal.append("}");
             _cppOutputFinal.append("");
+
+            _cppOutputFinal.append(String("std::string save_data(const ") + elementTypeCppName + "& input)");
+            _cppOutputFinal.append("{");
+            _cppOutputFinal.append("    xsdcpp::XmlWriter w;");
+            _cppOutputFinal.append(String("    _serialize_") + elementTypeCppName + "(w, \"" + i->name.name + "\", input);");
+            _cppOutputFinal.append("    return w.str();");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
+
+            _cppOutputFinal.append(String("void save_file(const std::string& filePath, const ") + elementTypeCppName + "& input)");
+            _cppOutputFinal.append("{");
+            _cppOutputFinal.append("    xsdcpp::write_file(filePath, save_data(input));");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
         }
 
 
@@ -321,6 +393,7 @@ public:
 private:
     const Xsd& _xsd;
     const List<String>& _externalNamespacePrefixes;
+    String _includePrefix;
 
     HashMap<String, String> _externalNamespaces;
 
@@ -329,12 +402,17 @@ private:
     List<String> _cppOutputAnonymousEnumValues;
     List<String> _cppOutputNamespaceSetValue;
     List<String> _cppOutputAnonymousFieldGetter;
+    List<String> _cppOutputAnonymousSerializeDecl;  // Forward declarations
+    List<String> _cppOutputAnonymousSerialize;       // Implementations
     List<String> _cppOutputNamespace;
     List<String>& _hppOutput;
     String _cppNamespace;
     HashSet<Xsd::Name> _generatedTypes2;
     HashSet<Xsd::Name> _generatedElementInfos2;
+    HashSet<String> _generatedElementInfoCppNames; // Track by C++ name to avoid duplicates for base types
     HashSet<Xsd::Name> _generatedTypeSetters;
+    HashSet<Xsd::Name> _generatedSerializeFunctions;
+    HashSet<String> _generatedPrimitiveSerializers;
     HashSet<const Xsd::AttributeRef*> _generatedAttributeSetDefaultValueFunctions;
     HashMap<const Xsd::AttributeRef*, uint64> _generatedAttributeTrackBits;
     HashSet<Xsd::Name> _requiredTypes;
@@ -398,7 +476,7 @@ private:
     {
         String result = toCppTypeIdentifier2(typeName);
         if (result == "_root_t" ||
-            result == "xsd::string" || 
+            result == "xsd::string" ||
             result == "uint64_t" ||
             result == "int64_t" ||
             result == "uint32_t" ||
@@ -435,10 +513,14 @@ private:
             cppName == "uint16_t" ||
             cppName == "int16_t" ||
             cppName == "double" ||
-            cppName == "float" ||
-            cppName == "bool")
+            cppName == "float")
             return String("xsdcpp::set_") + cppName;
-        return toCppNamespacePrefix(typeName) + "::_set_" + cppName;
+        if (cppName == "bool")
+            return String("xsdcpp::set_bool");
+        String prefix = toCppNamespacePrefix(typeName);
+        if (prefix.isEmpty())
+            return String("_set_") + cppName;
+        return prefix + "::_set_" + cppName;
     }
 
     usize getChildrenCount(const Xsd::Name& typeName) const
@@ -557,14 +639,14 @@ private:
 
     ReadTextMode getReadTextMode(const Xsd::Name& typeName) const
     {
+        // xs:any content (SkipProcessContentsFlag) applies to all type kinds,
+        // not just strings. Check this before the kind-specific logic.
+        if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
+            return SkipProcessingMode;
         Xsd::Type rootType = getType(getRootTypeName(typeName));
         if (rootType.kind == Xsd::Type::Kind::StringKind)
-        {
-            if (isSkipProcessContentsFlagSet(typeName) && getChildrenCount(typeName) == 0)
-                return SkipProcessingMode;
             return ReadAndProcessTextMode;
-        }
-        if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind || rootType.kind == Xsd::Type::Kind::ListKind)
+        if (rootType.kind == Xsd::Type::Kind::BaseKind || rootType.kind == Xsd::Type::Kind::EnumKind || rootType.kind == Xsd::Type::Kind::ListKind || rootType.kind == Xsd::Type::Kind::UnionKind)
             return ReadAndProcessTextMode;
         return SkipMode;
     }
@@ -836,7 +918,21 @@ private:
         }
         flags.append("xsdcpp::ElementInfo::ReadTextFlag");
         if (readTextMode == SkipProcessingMode)
+        {
             flags.append("xsdcpp::ElementInfo::SkipProcessingFlag");
+            // For complex types with xs:any, there is no field to write text into.
+            // The content is skipped; addText is nullptr (guarded in XmlParser).
+            Xsd::Type rootType2 = getType(getRootTypeName(typeName));
+            if (rootType2.kind != Xsd::Type::Kind::StringKind &&
+                rootType2.kind != Xsd::Type::Kind::BaseKind &&
+                rootType2.kind != Xsd::Type::Kind::EnumKind &&
+                rootType2.kind != Xsd::Type::Kind::ListKind &&
+                rootType2.kind != Xsd::Type::Kind::UnionKind)
+            {
+                addTextFunction = "nullptr";
+                return true;
+            }
+        }
 
         if (!generateTypeSetter(typeName))
             return false;
@@ -862,7 +958,17 @@ private:
             _generatedElementInfos2.append(typeName);
             return true;
         }
-        
+
+        String cppName = toCppTypeIdentifier2(typeName);
+
+        // Check if ElementInfo with this C++ name was already generated
+        // (multiple XSD types like nonNegativeInteger, positiveInteger, unsignedLong map to uint64_t)
+        if (_generatedElementInfoCppNames.contains(cppName))
+        {
+            _generatedElementInfos2.append(typeName);
+            return true;
+        }
+
         List<String> flags;
 
         String addTextFunction;
@@ -873,10 +979,10 @@ private:
         if (!flags.isEmpty())
             flagsStr.join(flags, '|');
 
-        String cppName = toCppTypeIdentifier2(typeName);
         _cppOutputNamespaceSetValue.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr + ", " + addTextFunction + " };");
 
         _generatedElementInfos2.append(typeName);
+        _generatedElementInfoCppNames.append(cppName);
         return true;
     }
 
@@ -1005,8 +1111,23 @@ private:
             String cppName = toCppTypeIdentifier2(typeName);
             _hppOutput.append(String("enum class ") + cppName);
             _hppOutput.append("{");
+            HashSet<String> usedEnumValues;
             for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-                _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
+            {
+                String enumValue = toCppIdentifier(*i);
+                // Handle duplicate enum values by appending a counter
+                if (usedEnumValues.contains(enumValue))
+                {
+                    int counter = 2;
+                    String uniqueValue;
+                    do {
+                        uniqueValue = enumValue + "_" + String::fromInt(counter++);
+                    } while (usedEnumValues.contains(uniqueValue));
+                    enumValue = uniqueValue;
+                }
+                usedEnumValues.append(enumValue);
+                _hppOutput.append(String("    ") + enumValue + ",");
+            }
             _hppOutput.append("};");
             _hppOutput.append("");
             _hppOutput.append(String("std::string to_string(") + cppName + ");");
@@ -1076,10 +1197,12 @@ private:
                 if (optionalWithoutDefaultValue)
                     structFields.append(String("xsd::optional<") + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "> " + toCppFieldIdentifier(attributeRef.name));
                 else
-                    structFields.append(toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + " " + toCppFieldIdentifier(attributeRef.name));
+                    structFields.append(toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + " " + toCppFieldIdentifier(attributeRef.name) + "{}");
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 structFields.append("xsd::vector<xsd::any_attribute> other_attributes");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                structFields.append("xsd::vector<xsd::any_element> other_elements");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
                 const Xsd::ElementRef& elementRef = *i;
@@ -1087,7 +1210,7 @@ private:
                 if (!processType2(elementRef.typeName, level + 1, typeDefinitionRequired))
                     return false;
                 if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                    structFields.append(toCppTypeIdentifierWithNamespace2(elementRef.typeName) + " " + toCppFieldIdentifier(elementRef.name));
+                    structFields.append(toCppTypeIdentifierWithNamespace2(elementRef.typeName) + " " + toCppFieldIdentifier(elementRef.name) + "{}");
                 else if (elementRef.maxOccurs == 1)
                     structFields.append(String("xsd::optional<") + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "> " + toCppFieldIdentifier(elementRef.name));
                 else
@@ -1097,7 +1220,10 @@ private:
             List<String> structDefintiion;
             if (baseType)
             {
-                if (baseType->kind == Xsd::Type::BaseKind || baseType->kind == Xsd::Type::EnumKind)
+                // Use xsd::base<> wrapper for primitive-derived types (BaseKind, EnumKind, SimpleRefKind)
+                // These are typedefs that can't be directly inherited in C++
+                if (baseType->kind == Xsd::Type::BaseKind || baseType->kind == Xsd::Type::EnumKind ||
+                    baseType->kind == Xsd::Type::SimpleRefKind)
                     structDefintiion.append(String("struct ") + cppName + " : xsd::base<" + toCppTypeIdentifierWithNamespace2(type.baseType) + ">");
                 else
                     structDefintiion.append(String("struct ") + cppName + " : " + toCppTypeIdentifierWithNamespace2(type.baseType));
@@ -1223,6 +1349,8 @@ private:
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 _cppOutputAnonymousFieldGetter.append(String("void _any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                _cppOutputAnonymousFieldGetter.append(String("void _any_elem_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_elements.emplace_back(xsd::any_element{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
@@ -1257,6 +1385,8 @@ private:
                 flags.append("xsdcpp::ElementInfo::EntryPointFlag");
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 flags.append("xsdcpp::ElementInfo::AnyAttributeFlag");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                flags.append("xsdcpp::ElementInfo::AnyElementFlag");
             if (mandatoryChildrenCount)
                 flags.append("xsdcpp::ElementInfo::CheckChildrenFlag");
 
@@ -1272,48 +1402,427 @@ private:
             if (!flags.isEmpty())
                 flagsStr.join(flags, '|');
 
-            _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
+            _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount)
                 + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) + "ULL"
-                + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
+                + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info")
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
+                + ", " + (type.flags & Xsd::Type::AnyElementFlag ? String("(xsdcpp::set_any_element_t)&_any_elem_") + cppName : String("nullptr"))
                 + " };");
 
             _generatedElementInfos2.append(typeName);
+
+            // Generate serialize function for this element type
+            if (!generateSerializeFunction(typeName))
+                return false;
 
             return true;
         }
 
         return false; // logic error
     }
+
+    bool generateSerializeFunction(const Xsd::Name& typeName)
+    {
+        if (_generatedSerializeFunctions.contains(typeName))
+            return true;
+
+        // Skip the root type - it's internal only
+        if (typeName == _xsd.rootType)
+            return true;
+
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return _error = String::fromPrintf("Type '%s' not found for serialization", (const char*)typeName.name), false;
+
+        _generatedSerializeFunctions.append(typeName);
+
+        const Xsd::Type& type = *it;
+        String cppName = toCppTypeIdentifier2(typeName);
+        String cppNameWithNamespace = toCppTypeIdentifierWithNamespace2(typeName);
+
+        // Generate serialize functions for primitive types (track by cppName to avoid duplicates)
+        if (cppName == "xsd::string")
+        {
+            if (!_generatedPrimitiveSerializers.contains(cppName))
+            {
+                _generatedPrimitiveSerializers.append(cppName);
+                _cppOutputAnonymousSerializeDecl.append("void _serialize_xsd__string(xsdcpp::XmlWriter& w, const char* name, const xsd::string& v);");
+                _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_xsd__string(xsdcpp::XmlWriter& w, const char* name, const xsd::string& v) {"));
+                _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+                _cppOutputAnonymousSerialize.append("    w.writeText(v);");
+                _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+                _cppOutputAnonymousSerialize.append("}");
+                _cppOutputAnonymousSerialize.append("");
+            }
+            return true;
+        }
+        if (cppName == "uint64_t" || cppName == "int64_t" ||
+            cppName == "uint32_t" || cppName == "int32_t" || cppName == "uint16_t" ||
+            cppName == "int16_t" || cppName == "double" || cppName == "float" || cppName == "bool")
+        {
+            if (!_generatedPrimitiveSerializers.contains(cppName))
+            {
+                _generatedPrimitiveSerializers.append(cppName);
+                _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, " + cppName + " v);");
+                _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, " + cppName + " v) {");
+                _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+                _cppOutputAnonymousSerialize.append(String("    w.writeText(xsdcpp::get_string(v));"));
+                _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+                _cppOutputAnonymousSerialize.append("}");
+                _cppOutputAnonymousSerialize.append("");
+            }
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::SubstitutionGroupKind)
+        {
+            // Add forward declaration
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char*, const " + cppNameWithNamespace + "& v);");
+
+            // First generate serialize functions for child types (before opening parent function)
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                if (!generateSerializeFunction(i->typeName))
+                    return false;
+            }
+
+            // Then generate serialize for choice type - serialize whichever option is present
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char*, const " + cppNameWithNamespace + "& v) {");
+            bool first = true;
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                const Xsd::ElementRef& elementRef = *i;
+                String prefix = first ? String("    if") : String("    else if");
+                first = false;
+                _cppOutputAnonymousSerialize.append(prefix + " ((&v)->" + toCppFieldIdentifier(elementRef.name) + ") _serialize_" + toCppTypeIdentifier2(elementRef.typeName) + "(w, \"" + elementRef.name.name + "\", *(&v)->" + toCppFieldIdentifier(elementRef.name) + ");");
+            }
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::EnumKind)
+        {
+            // Forward declaration and implementation for enum
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
+            _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+            _cppOutputAnonymousSerialize.append(String("    w.writeText(") + toCppNamespacePrefix(typeName) + "::to_string(v));");
+            _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::StringKind || type.kind == Xsd::Type::UnionKind)
+        {
+            // Forward declaration and implementation for string types
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
+            _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+            _cppOutputAnonymousSerialize.append("    w.writeText(v);");
+            _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::ListKind)
+        {
+            // Forward declaration and implementation for list types
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+            String itemCppName = toCppTypeIdentifier2(type.baseType);
+            Xsd::Type itemType = getType(type.baseType);
+            String itemSerializer = (itemType.kind == Xsd::Type::EnumKind)
+                ? String("to_string(v[i])")
+                : String("xsdcpp::get_string(v[i])");
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
+            _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+            _cppOutputAnonymousSerialize.append("    std::string text;");
+            _cppOutputAnonymousSerialize.append("    for (size_t i = 0; i < v.size(); ++i) {");
+            _cppOutputAnonymousSerialize.append("        if (i > 0) text += ' ';");
+            _cppOutputAnonymousSerialize.append(String("        text += ") + itemSerializer + ";");
+            _cppOutputAnonymousSerialize.append("    }");
+            _cppOutputAnonymousSerialize.append("    w.writeText(text);");
+            _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::SimpleRefKind)
+        {
+            // Forward declaration
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+            // SimpleRef is a typedef - delegate to base type
+            if (!generateSerializeFunction(type.baseType))
+                return false;
+            String baseCppName = toCppTypeIdentifier2(type.baseType);
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
+            _cppOutputAnonymousSerialize.append(String("    _serialize_") + baseCppName + "(w, name, v);");
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        if (type.kind == Xsd::Type::ElementKind)
+        {
+            // Add forward declaration first
+            _cppOutputAnonymousSerializeDecl.append(String("void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v);");
+
+            // Generate serialize for base type first if it exists
+            if (!type.baseType.name.isEmpty())
+            {
+                if (!generateSerializeFunction(type.baseType))
+                    return false;
+            }
+
+            // Generate serialize for child element types
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            {
+                if (!generateSerializeFunction(i->typeName))
+                    return false;
+            }
+
+            _cppOutputAnonymousSerialize.append(String("XSDCPP_MAYBE_UNUSED void _serialize_") + cppName + "(xsdcpp::XmlWriter& w, const char* name, const " + cppNameWithNamespace + "& v) {");
+            _cppOutputAnonymousSerialize.append("    w.startElement(name);");
+
+            // Serialize attributes (from this type and inherited)
+            generateSerializeAttributes(typeName);
+
+            // Serialize child elements (from this type and inherited)
+            generateSerializeChildren(typeName);
+
+            // Check if this type has simple content (inherits from simple type)
+            Xsd::Name simpleBaseTypeName = getSimpleBaseTypeName(typeName);
+            if (!simpleBaseTypeName.name.isEmpty())
+            {
+                Xsd::Type simpleBaseType = getType(simpleBaseTypeName);
+                if (simpleBaseType.kind == Xsd::Type::EnumKind)
+                {
+                    // Write enum value as text
+                    _cppOutputAnonymousSerialize.append(String("    w.writeText(to_string(static_cast<") + toCppTypeIdentifierWithNamespace2(simpleBaseTypeName) + ">(v)));");
+                }
+                else if (simpleBaseType.kind == Xsd::Type::StringKind)
+                {
+                    // Write string value as text
+                    _cppOutputAnonymousSerialize.append(String("    w.writeText(static_cast<const xsd::string&>(v));"));
+                }
+                else if (simpleBaseType.kind == Xsd::Type::BaseKind)
+                {
+                    // Write base type value as text
+                    String baseCppType = toCppTypeIdentifier2(simpleBaseTypeName);
+                    _cppOutputAnonymousSerialize.append(String("    w.writeText(xsdcpp::get_string(static_cast<") + baseCppType + ">(v)));");
+                }
+            }
+
+            _cppOutputAnonymousSerialize.append("    w.endElement(name);");
+            _cppOutputAnonymousSerialize.append("}");
+            _cppOutputAnonymousSerialize.append("");
+            return true;
+        }
+
+        return true;
+    }
+
+    void generateSerializeAttributes(const Xsd::Name& typeName)
+    {
+        if (typeName.name.isEmpty())
+            return;
+
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return;
+
+        const Xsd::Type& type = *it;
+
+        // First serialize inherited attributes
+        if (!type.baseType.name.isEmpty() && type.kind == Xsd::Type::ElementKind)
+        {
+            Xsd::Type baseType = getType(type.baseType);
+            if (baseType.kind == Xsd::Type::ElementKind)
+                generateSerializeAttributes(type.baseType);
+        }
+
+        // Then serialize this type's attributes
+        for (List<Xsd::AttributeRef>::Iterator i = type.attributes.begin(), end = type.attributes.end(); i != end; ++i)
+        {
+            const Xsd::AttributeRef& attrRef = *i;
+            String fieldName = toCppFieldIdentifier(attrRef.name);
+            bool optionalWithoutDefaultValue = !attrRef.isMandatory && attrRef.defaultValue.isNull();
+
+            if (optionalWithoutDefaultValue)
+            {
+                // Optional attribute - only write if present (use (&v)->field to avoid ambiguity)
+                _cppOutputAnonymousSerialize.append(String("    if ((&v)->") + fieldName + ") w.writeAttribute(\"" + attrRef.name.name + "\", " + toGetStringCall(attrRef.typeName, String("*(&v)->") + fieldName) + ");");
+            }
+            else
+            {
+                // Mandatory or has default value - always write
+                _cppOutputAnonymousSerialize.append(String("    w.writeAttribute(\"") + attrRef.name.name + "\", " + toGetStringCall(attrRef.typeName, String("(&v)->") + fieldName) + ");");
+            }
+        }
+
+        // Handle any_attribute
+        if (type.flags & Xsd::Type::AnyAttributeFlag)
+        {
+            _cppOutputAnonymousSerialize.append("    for (const auto& attr : (&v)->other_attributes) w.writeAttribute(attr.name.c_str(), attr.value);");
+        }
+    }
+
+    void generateSerializeChildren(const Xsd::Name& typeName, const Xsd::Name& ownerTypeName = Xsd::Name())
+    {
+        if (typeName.name.isEmpty())
+            return;
+
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it == _xsd.types.end())
+            return;
+
+        const Xsd::Type& type = *it;
+
+        // Use the owner type for field access, or the current type if we're the owner
+        const Xsd::Name& effectiveOwner = ownerTypeName.name.isEmpty() ? typeName : ownerTypeName;
+
+        // When accessing fields, use cast to the type that defines them to avoid name lookup issues
+        String fieldAccess;
+        if (typeName == effectiveOwner)
+            fieldAccess = "v.";
+        else
+            fieldAccess = String("static_cast<const ") + toCppTypeIdentifierWithNamespace2(typeName) + "&>(v).";
+
+        // First serialize inherited children
+        if (!type.baseType.name.isEmpty() && type.kind == Xsd::Type::ElementKind)
+        {
+            Xsd::Type baseType = getType(type.baseType);
+            if (baseType.kind == Xsd::Type::ElementKind)
+                generateSerializeChildren(type.baseType, effectiveOwner);
+        }
+
+        // Then serialize this type's children
+        for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+        {
+            const Xsd::ElementRef& elemRef = *i;
+            String fieldName = toCppFieldIdentifier(elemRef.name);
+            String elemTypeCppName = toCppTypeIdentifier2(elemRef.typeName);
+
+            const Xsd::Type& elemType = *_xsd.types.find(elemRef.typeName);
+
+            if (elemRef.minOccurs == 1 && elemRef.maxOccurs == 1)
+            {
+                // Mandatory single element
+                _cppOutputAnonymousSerialize.append(String("    _serialize_") + elemTypeCppName + "(w, \"" + elemRef.name.name + "\", " + fieldAccess + fieldName + ");");
+            }
+            else if (elemRef.maxOccurs == 1)
+            {
+                // Optional single element
+                _cppOutputAnonymousSerialize.append(String("    if (") + fieldAccess + fieldName + ") _serialize_" + elemTypeCppName + "(w, \"" + elemRef.name.name + "\", *" + fieldAccess + fieldName + ");");
+            }
+            else
+            {
+                // Vector of elements
+                _cppOutputAnonymousSerialize.append(String("    for (const auto& item : ") + fieldAccess + fieldName + ") _serialize_" + elemTypeCppName + "(w, \"" + elemRef.name.name + "\", item);");
+            }
+        }
+
+        // Serialize xs:any elements captured in other_elements
+        if (type.flags & Xsd::Type::AnyElementFlag)
+            _cppOutputAnonymousSerialize.append(String("    for (const auto& e : ") + fieldAccess + "other_elements) { w.startElement(e.name.c_str()); w.writeText(e.value); w.endElement(e.name.c_str()); }");
+    }
+
+    String toGetStringCall(const Xsd::Name& typeName, const String& value)
+    {
+        String cppName = toCppTypeIdentifier2(typeName);
+
+        // For primitive types, use xsdcpp::get_string
+        if (cppName == "xsd::string")
+            return value;
+        if (cppName == "uint64_t" || cppName == "int64_t" || cppName == "uint32_t" ||
+            cppName == "int32_t" || cppName == "uint16_t" || cppName == "int16_t" ||
+            cppName == "double" || cppName == "float" || cppName == "bool")
+            return String("xsdcpp::get_string(") + value + ")";
+
+        // For enum types, use to_string
+        HashMap<Xsd::Name, Xsd::Type>::Iterator it = _xsd.types.find(typeName);
+        if (it != _xsd.types.end())
+        {
+            const Xsd::Type& type = *it;
+            if (type.kind == Xsd::Type::EnumKind)
+                return String("to_string(") + value + ")";
+            if (type.kind == Xsd::Type::StringKind || type.kind == Xsd::Type::UnionKind)
+                return value;
+            if (type.kind == Xsd::Type::SimpleRefKind)
+                return toGetStringCall(type.baseType, value);
+            if (type.kind == Xsd::Type::ListKind)
+            {
+                // For list types, check if items are enums
+                Xsd::Type itemType = getType(type.baseType);
+                if (itemType.kind == Xsd::Type::EnumKind)
+                {
+                    // For list of enums, use to_string - generate inline lambda
+                    return String("[&]() { std::string r; for (size_t i = 0; i < ") + value + ".size(); ++i) { if (i > 0) r += ' '; r += " + toCppNamespacePrefix(type.baseType) + "::to_string(" + value + "[i]); } return r; }()";
+                }
+                return String("xsdcpp::_serialize_list(") + value + ")";
+            }
+            // For element kind that wraps a simple type (xsd:base<>)
+            if (type.kind == Xsd::Type::ElementKind && !type.baseType.name.isEmpty())
+            {
+                Xsd::Name simpleBase = getSimpleBaseTypeName(typeName);
+                if (!simpleBase.name.isEmpty())
+                    return toGetStringCall(simpleBase, String("static_cast<") + toCppTypeIdentifierWithNamespace2(simpleBase) + ">(" + value + ")");
+            }
+        }
+
+        return String("xsdcpp::get_string(") + value + ")";
+    }
 };
 
 }
 
-bool generateCpp(const Xsd& xsd, const String& outputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, String& error)
+bool generateCpp(const Xsd& xsd, const String& headerOutputDir, const String& cppOutputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, const String& wrapNamespace, const String& includePrefix, String& error)
 {
     List<String> cppOutput;
     List<String> hppOutput;
-    Generator generator(xsd, excludedNamespacePrefixes, forceTypeProcessing, cppOutput, hppOutput);
+    Generator generator(xsd, excludedNamespacePrefixes, forceTypeProcessing, cppOutput, hppOutput, includePrefix);
     if (!generator.process())
         return (error = generator.getError()), false;
 
     String cppName = toCppIdentifier(xsd.name);
+    String nsOpen = generateNamespaceOpen(wrapNamespace);
+    String nsClose = generateNamespaceClose(wrapNamespace);
 
+    // Write header file (.hpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + ".hpp";
+        String outputFilePath = headerOutputDir + "/" + cppName + ".hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
+        bool wroteNsOpen = wrapNamespace.isEmpty();
         for (List<String>::Iterator i = hppOutput.begin(), end = hppOutput.end(); i != end; ++i)
+        {
+            // Insert wrap namespace before the first content (namespace, struct, enum, etc.)
+            // but after #pragma, #include, and empty lines
+            if (!wroteNsOpen && !i->isEmpty() && !i->startsWith("#"))
+            {
+                if (!outputFile.write(nsOpen))
+                    return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+                wroteNsOpen = true;
+            }
             if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        }
+        // Close wrap namespace at end
+        if (!wrapNamespace.isEmpty())
+            if (!outputFile.write(nsClose))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
+    // Write implementation file (.cpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + ".cpp";
+        String outputFilePath = cppOutputDir + "/" + cppName + ".cpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
@@ -1323,14 +1832,42 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, const List<String>& ex
         if (excludedNamespacePrefixes.isEmpty())
             if (!outputFile.write(XmlParser_cpp))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        if (!outputFile.write(XmlWriter_hpp))
+            return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        if (excludedNamespacePrefixes.isEmpty())
+            if (!outputFile.write(XmlWriter_cpp))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+
+        // Write content, inserting wrap namespace at the appropriate point
+        // The content structure is:
+        // 1. #include line and external namespace declarations - OUTSIDE wrap
+        // 2. anonymous/named namespace blocks with actual code - INSIDE wrap
+        bool wroteNsOpen = wrapNamespace.isEmpty();
+        String ourNamespaceStart = String("namespace ") + cppName + " {";
+        String anonNamespaceStart = "namespace {";
 
         for (List<String>::Iterator i = cppOutput.begin(), end = cppOutput.end(); i != end; ++i)
+        {
+            // Insert wrap namespace before first anonymous or our namespace declaration
+            if (!wroteNsOpen && (*i == anonNamespaceStart || *i == ourNamespaceStart))
+            {
+                if (!outputFile.write(nsOpen))
+                    return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+                wroteNsOpen = true;
+            }
             if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        }
+
+        // Write wrap namespace close
+        if (!wrapNamespace.isEmpty())
+            if (!outputFile.write(nsClose))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
+    // Write xsd header file (_xsd.hpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + "_xsd.hpp";
+        String outputFilePath = headerOutputDir + "/" + cppName + "_xsd.hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;

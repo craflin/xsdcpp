@@ -101,10 +101,45 @@ target_link_libraries(XsdLib_test PRIVATE mingtest::gtest mingtest::gtest_main)
 add_test(NAME XsdLib_test COMMAND XsdLib_test)
 target_require_cpp11(XsdLib_test)
 
+# Test wrap namespace option (-w)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/wrap")
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd" -H "${CMAKE_CURRENT_BINARY_DIR}/wrap" -C "${CMAKE_CURRENT_BINARY_DIR}/wrap" -w testns::inner
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/wrap/Example.hpp" "${CMAKE_CURRENT_BINARY_DIR}/wrap/Example.cpp" "${CMAKE_CURRENT_BINARY_DIR}/wrap/Example_xsd.hpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd"
+)
+add_executable(WrapNamespace_test
+    WrapNamespace_test.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/wrap/Example.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/wrap/Example.cpp"
+)
+target_require_cpp11(WrapNamespace_test)
+target_link_libraries(WrapNamespace_test PRIVATE mingtest::gtest mingtest::gtest_main)
+target_include_directories(WrapNamespace_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/wrap")
+add_test(NAME WrapNamespace_test COMMAND WrapNamespace_test)
+
+# Test wrap namespace + inner namespace rename options (-w -n)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/rename")
+add_custom_command(
+    COMMAND "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd" -H "${CMAKE_CURRENT_BINARY_DIR}/rename" -C "${CMAKE_CURRENT_BINARY_DIR}/rename" -w flatns -n domain
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/rename/domain.hpp" "${CMAKE_CURRENT_BINARY_DIR}/rename/domain.cpp" "${CMAKE_CURRENT_BINARY_DIR}/rename/domain_xsd.hpp"
+    DEPENDS "$<TARGET_FILE:xsdcpp>" "${CMAKE_CURRENT_SOURCE_DIR}/Example.xsd"
+)
+add_executable(RenameNamespace_test
+    RenameNamespace_test.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/rename/domain.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/rename/domain.cpp"
+)
+target_require_cpp11(RenameNamespace_test)
+target_link_libraries(RenameNamespace_test PRIVATE mingtest::gtest mingtest::gtest_main)
+target_include_directories(RenameNamespace_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/rename")
+add_test(NAME RenameNamespace_test COMMAND RenameNamespace_test)
+
 add_subdirectory(ecic)
 add_subdirectory(ecoa)
+add_subdirectory(ore)
 
-set_target_properties(XmlParser_test Ecic_test Ecoa_test Generator_test Reader_test Features_test XsdLib_test
+set_target_properties(XmlParser_test Ecic_test Ecoa_test Ore_test Generator_test Reader_test Features_test XsdLib_test WrapNamespace_test RenameNamespace_test
     PROPERTIES
         FOLDER   "test"
 )
