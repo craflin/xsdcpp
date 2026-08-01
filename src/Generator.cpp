@@ -5,10 +5,85 @@
 #include <nstd/Error.hpp>
 #include <nstd/File.hpp>
 #include <nstd/HashMap.hpp>
+#include <nstd/HashSet.hpp>
 
 #include <Resources.hpp>
 
 namespace {
+
+HashSet<String> loadCppKeywords()
+{
+    HashSet<String> keywords(100);
+    keywords.append("linux");
+    keywords.append("union");
+    keywords.append("enum");
+    keywords.append("bool");
+    keywords.append("true" );
+    keywords.append("false");
+    keywords.append("class");
+    keywords.append("struct");
+    keywords.append("int");
+    keywords.append("double");
+    keywords.append("float");
+    keywords.append("char");
+    keywords.append("void");
+    keywords.append("long");
+    keywords.append("short");
+    keywords.append("signed");
+    keywords.append("unsigned");
+    keywords.append("const");
+    keywords.append("volatile");
+    keywords.append("static");
+    keywords.append("extern");
+    keywords.append("register");
+    keywords.append("auto");
+    keywords.append("typedef");
+    keywords.append("virtual");
+    keywords.append("explicit");
+    keywords.append("friend");
+    keywords.append("inline");
+    keywords.append("mutable");
+    keywords.append("namespace");
+    keywords.append("new");
+    keywords.append("delete");
+    keywords.append("this");
+    keywords.append("operator");
+    keywords.append("private");
+    keywords.append("protected");
+    keywords.append("public");
+    keywords.append("template");
+    keywords.append("typename");
+    keywords.append("using");
+    keywords.append("throw");
+    keywords.append("try");
+    keywords.append("catch");
+    keywords.append("return");
+    keywords.append("break");
+    keywords.append("continue");
+    keywords.append("goto");
+    keywords.append("if");
+    keywords.append("else");
+    keywords.append("switch");
+    keywords.append("case");
+    keywords.append("default");
+    keywords.append("for");
+    keywords.append("while");
+    keywords.append("do");
+    keywords.append("sizeof");
+    keywords.append("alignof");
+    keywords.append("decltype");
+    keywords.append("nullptr");
+    keywords.append("constexpr");
+    keywords.append("noexcept");
+    keywords.append("override");
+    keywords.append("final");
+    keywords.append("NULL");
+    keywords.append("TRUE");
+    keywords.append("FALSE");
+    return keywords;
+}
+
+HashSet<String> CppKeywords = loadCppKeywords();
 
 String toCppIdentifier(const String& str)
 {
@@ -22,33 +97,10 @@ String toCppIdentifier(const String& str)
     }
     if (result.isEmpty() || String::isDigit(*(const char*)result))
         result.prepend("_");
-    // Escape C++ reserved keywords
-    if (result == "union" || result == "enum" || result == "linux" ||
-        result == "bool" || result == "true" || result == "false" ||
-        result == "class" || result == "struct" || result == "int" ||
-        result == "double" || result == "float" || result == "char" ||
-        result == "void" || result == "long" || result == "short" ||
-        result == "signed" || result == "unsigned" || result == "const" ||
-        result == "volatile" || result == "static" || result == "extern" ||
-        result == "register" || result == "auto" || result == "typedef" ||
-        result == "virtual" || result == "explicit" || result == "friend" ||
-        result == "inline" || result == "mutable" || result == "namespace" ||
-        result == "new" || result == "delete" || result == "this" ||
-        result == "operator" || result == "private" || result == "protected" ||
-        result == "public" || result == "template" || result == "typename" ||
-        result == "using" || result == "throw" || result == "try" ||
-        result == "catch" || result == "return" || result == "break" ||
-        result == "continue" || result == "goto" || result == "if" ||
-        result == "else" || result == "switch" || result == "case" ||
-        result == "default" || result == "for" || result == "while" ||
-        result == "do" || result == "sizeof" || result == "alignof" ||
-        result == "decltype" || result == "nullptr" || result == "constexpr" ||
-        result == "noexcept" || result == "override" || result == "final" ||
-        result == "NULL" || result == "TRUE" || result == "FALSE")
+    if (CppKeywords.contains(result))
         result.append("_");
     return result;
 }
-
 
 String toCppFieldIdentifier(const Xsd::Name& name)
 {
