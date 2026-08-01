@@ -432,6 +432,16 @@ private:
             if (!refPos)
                 return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)refName.name)), false;
 
+            // Abstract elements have no type definition - they serve as placeholders for substitution groups.
+            // Record the reference for later resolution by resolveElementRefs().
+            if (getXmlAttribute(*refPos.element, "abstract", "false").toBool())
+            {
+                elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
+                elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+                elementRef.refName = refName;
+                return true;
+            }
+
             if (!processXsElement(refPos, Xsd::Name(), elementRef, atRoot))
                 return false;
 
