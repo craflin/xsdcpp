@@ -103,8 +103,9 @@ target_require_cpp11(XsdLib_test)
 
 add_subdirectory(ecic)
 add_subdirectory(ecoa)
+add_subdirectory(ore)
 
-set_target_properties(XmlParser_test Ecic_test Ecoa_test Generator_test Reader_test Features_test XsdLib_test
+set_target_properties(XmlParser_test Ecic_test Ecoa_test Ore_test Generator_test Reader_test Features_test XsdLib_test
     PROPERTIES
         FOLDER   "test"
 )
