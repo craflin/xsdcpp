@@ -334,6 +334,7 @@ private:
     String _cppNamespace;
     HashSet<Xsd::Name> _generatedTypes2;
     HashSet<Xsd::Name> _generatedElementInfos2;
+    HashSet<String> _generatedElementInfoCppNames; // Track by C++ name to avoid duplicates for base types
     HashSet<Xsd::Name> _generatedTypeSetters;
     HashSet<const Xsd::AttributeRef*> _generatedAttributeSetDefaultValueFunctions;
     HashMap<const Xsd::AttributeRef*, uint64> _generatedAttributeTrackBits;
@@ -398,7 +399,7 @@ private:
     {
         String result = toCppTypeIdentifier2(typeName);
         if (result == "_root_t" ||
-            result == "xsd::string" || 
+            result == "xsd::string" ||
             result == "uint64_t" ||
             result == "int64_t" ||
             result == "uint32_t" ||
@@ -435,9 +436,10 @@ private:
             cppName == "uint16_t" ||
             cppName == "int16_t" ||
             cppName == "double" ||
-            cppName == "float" ||
-            cppName == "bool")
+            cppName == "float")
             return String("xsdcpp::set_") + cppName;
+        if (cppName == "bool")
+            return String("xsdcpp::set_bool");
         return toCppNamespacePrefix(typeName) + "::_set_" + cppName;
     }
 
@@ -862,7 +864,17 @@ private:
             _generatedElementInfos2.append(typeName);
             return true;
         }
-        
+
+        String cppName = toCppTypeIdentifier2(typeName);
+
+        // Check if ElementInfo with this C++ name was already generated
+        // (multiple XSD types like nonNegativeInteger, positiveInteger, unsignedLong map to uint64_t)
+        if (_generatedElementInfoCppNames.contains(cppName))
+        {
+            _generatedElementInfos2.append(typeName);
+            return true;
+        }
+
         List<String> flags;
 
         String addTextFunction;
@@ -873,10 +885,10 @@ private:
         if (!flags.isEmpty())
             flagsStr.join(flags, '|');
 
-        String cppName = toCppTypeIdentifier2(typeName);
         _cppOutputNamespaceSetValue.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr + ", " + addTextFunction + " };");
 
         _generatedElementInfos2.append(typeName);
+        _generatedElementInfoCppNames.append(cppName);
         return true;
     }
 

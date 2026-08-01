@@ -757,6 +757,18 @@ private:
                         for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                         {
                             const Xsd::ElementRef& choiceElement = *i;
+                            // Skip if an element with the same name already exists (can happen with choice branches)
+                            bool exists = false;
+                            for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                            {
+                                if (j->name.name == choiceElement.name.name)
+                                {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            if (exists)
+                                continue;
                             Xsd::ElementRef& elementRef = elements.append(choiceElement);
                             //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was not actually set in choiceElement?
                             elementRef.minOccurs = 0;
@@ -818,6 +830,18 @@ private:
                                             for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                                             {
                                                 const Xsd::ElementRef& choiceElement = *i;
+                                                // Skip if an element with the same name already exists (can happen with choice branches)
+                                                bool exists = false;
+                                                for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                                                {
+                                                    if (j->name.name == choiceElement.name.name)
+                                                    {
+                                                        exists = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (exists)
+                                                    continue;
                                                 Xsd::ElementRef& elementRef = elements.append(choiceElement);
                                                 //elementRef.minOccurs = minOccurs;  // todo: skip this if min/max was set actually set in choiceElement?
                                                 elementRef.minOccurs  = 0;
@@ -982,14 +1006,25 @@ private:
                 if (elementRef.name.name.isEmpty() || elementRef.typeName.name.isEmpty())
                     continue;
 
-                elements.append(elementRef);
+                // Skip if an element with the same name already exists (can happen with choice branches)
+                bool exists = false;
+                for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                {
+                    if (j->name.name == elementRef.name.name)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists)
+                    elements.append(elementRef);
             }
             else if (compareXsName(position, element.type, "choice"))
             {
                 Position choicePosition;
                 choicePosition.element = &element;
                 choicePosition.xsdFileData = position.xsdFileData;
-            
+
                 List<Xsd::ElementRef> choiceElements;
                 uint32 _;
                 if (!processXsAllEtAl(choicePosition, parentTypeName,  choiceElements, _))
@@ -999,10 +1034,22 @@ private:
                 {
                     uint minOccurs = getXmlAttribute(element, "minOccurs", getXmlAttribute(*position.element, "minOccurs", "1")).toUInt();
                     uint maxOccurs = getXmlAttribute(element, "maxOccurs", getXmlAttribute(*position.element, "maxOccurs", "1")).toUInt();
-                    
+
                     for (List<Xsd::ElementRef>::Iterator i = choiceElements.begin(), end = choiceElements.end(); i != end; ++i)
                     {
                         const Xsd::ElementRef& choiceElement = *i;
+                        // Skip if an element with the same name already exists (can happen with choice branches)
+                        bool exists = false;
+                        for (List<Xsd::ElementRef>::Iterator j = elements.begin(), jend = elements.end(); j != jend; ++j)
+                        {
+                            if (j->name.name == choiceElement.name.name)
+                            {
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (exists)
+                            continue;
                         Xsd::ElementRef& elementRef = elements.append(choiceElement);
                         //elementRef.minOccurs = minOccurs; // todo: skip this if min/max was set actually set in choiceElement?
                         elementRef.minOccurs = 0;
