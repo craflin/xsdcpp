@@ -11,6 +11,51 @@
 
 namespace {
 
+// Split a namespace string like "a::b::c" into individual parts
+List<String> splitNamespace(const String& ns)
+{
+    List<String> parts;
+    if (ns.isEmpty())
+        return parts;
+
+    const char* base = (const char*)ns;
+    const char* start = base;
+    for (;;)
+    {
+        const char* pos = String::find(start, "::");
+        if (!pos)
+        {
+            // Remaining part after last ::
+            parts.append(ns.substr(start - base));
+            break;
+        }
+        // Part between start and pos
+        parts.append(ns.substr(start - base, pos - start));
+        start = pos + 2;
+    }
+    return parts;
+}
+
+// Generate opening namespace declarations for C++11 (one per line)
+String generateNamespaceOpen(const String& ns)
+{
+    List<String> parts = splitNamespace(ns);
+    String result;
+    for (List<String>::Iterator i = parts.begin(), end = parts.end(); i != end; ++i)
+        result += String("namespace ") + *i + " {\n";
+    return result;
+}
+
+// Generate closing braces for namespace (one per line)
+String generateNamespaceClose(const String& ns)
+{
+    List<String> parts = splitNamespace(ns);
+    String result;
+    for (List<String>::Iterator i = parts.begin(), end = parts.end(); i != end; ++i)
+        result += "}\n";
+    return result;
+}
+
 HashSet<String> loadCppKeywords()
 {
     HashSet<String> keywords(100);
@@ -1321,7 +1366,7 @@ private:
 
 }
 
-bool generateCpp(const Xsd& xsd, const String& outputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, String& error)
+bool generateCpp(const Xsd& xsd, const String& headerOutputDir, const String& cppOutputDir, const List<String>& excludedNamespacePrefixes, const List<String>& forceTypeProcessing, const String& wrapNamespace, String& error)
 {
     List<String> cppOutput;
     List<String> hppOutput;
@@ -1330,20 +1375,38 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, const List<String>& ex
         return (error = generator.getError()), false;
 
     String cppName = toCppIdentifier(xsd.name);
+    String nsOpen = generateNamespaceOpen(wrapNamespace);
+    String nsClose = generateNamespaceClose(wrapNamespace);
 
+    // Write header file (.hpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + ".hpp";
+        String outputFilePath = headerOutputDir + "/" + cppName + ".hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
+        bool wroteNsOpen = wrapNamespace.isEmpty();
         for (List<String>::Iterator i = hppOutput.begin(), end = hppOutput.end(); i != end; ++i)
+        {
+            // Insert wrap namespace before the first namespace declaration
+            if (!wroteNsOpen && i->startsWith("namespace "))
+            {
+                if (!outputFile.write(nsOpen))
+                    return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+                wroteNsOpen = true;
+            }
             if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        }
+        // Close wrap namespace at end
+        if (!wrapNamespace.isEmpty())
+            if (!outputFile.write(nsClose))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
+    // Write implementation file (.cpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + ".cpp";
+        String outputFilePath = cppOutputDir + "/" + cppName + ".cpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
@@ -1354,13 +1417,36 @@ bool generateCpp(const Xsd& xsd, const String& outputDir, const List<String>& ex
             if (!outputFile.write(XmlParser_cpp))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
 
+        // Write content, inserting wrap namespace at the appropriate point
+        // The content structure is:
+        // 1. #include line and external namespace declarations - OUTSIDE wrap
+        // 2. anonymous/named namespace blocks with actual code - INSIDE wrap
+        bool wroteNsOpen = wrapNamespace.isEmpty();
+        String ourNamespaceStart = String("namespace ") + cppName + " {";
+        String anonNamespaceStart = "namespace {";
+
         for (List<String>::Iterator i = cppOutput.begin(), end = cppOutput.end(); i != end; ++i)
+        {
+            // Insert wrap namespace before first anonymous or our namespace declaration
+            if (!wroteNsOpen && (*i == anonNamespaceStart || *i == ourNamespaceStart))
+            {
+                if (!outputFile.write(nsOpen))
+                    return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+                wroteNsOpen = true;
+            }
             if (!outputFile.write(*i + "\n"))
+                return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
+        }
+
+        // Write wrap namespace close
+        if (!wrapNamespace.isEmpty())
+            if (!outputFile.write(nsClose))
                 return (error = String::fromPrintf("Could not write to file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
     }
 
+    // Write xsd header file (_xsd.hpp)
     {
-        String outputFilePath = outputDir + "/" + cppName + "_xsd.hpp";
+        String outputFilePath = headerOutputDir + "/" + cppName + "_xsd.hpp";
         File outputFile;
         if (!outputFile.open(outputFilePath, File::writeFlag))
             return (error = String::fromPrintf("Could not open file '%s': %s", (const char*)outputFilePath, (const char*)Error::getErrorString())), false;
