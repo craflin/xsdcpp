@@ -1091,6 +1091,10 @@ private:
                 {
                     flags |= Xsd::Type::AnyAttributeFlag;
                 }
+                else if (compareXsName(position, element.type, "any"))
+                {
+                    flags |= Xsd::Type::AnyElementFlag;
+                }
                 else
                     Console::printf("skipped %s\n", (const char*)element.type);
             }
@@ -1375,8 +1379,10 @@ private:
             else if (compareXsName(position, element.type, "any"))
             {
                  String processContents = getXmlAttribute(element, "processContents");
-                 if (processContents == "skip" || processContents == "lax")
+                 if (processContents == "skip")
                      flags |= Xsd::Type::SkipProcessContentsFlag;
+                 else  // "lax", "strict", or unspecified: capture as any_element
+                     flags |= Xsd::Type::AnyElementFlag;
             }
             else
                 Console::printf("skipped %s\n", (const char*)element.type);

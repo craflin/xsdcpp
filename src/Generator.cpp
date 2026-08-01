@@ -1201,6 +1201,8 @@ private:
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 structFields.append("xsd::vector<xsd::any_attribute> other_attributes");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                structFields.append("xsd::vector<xsd::any_element> other_elements");
             for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
             {
                 const Xsd::ElementRef& elementRef = *i;
@@ -1347,6 +1349,8 @@ private:
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 _cppOutputAnonymousFieldGetter.append(String("void _any_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_attributes.emplace_back(xsd::any_attribute{std::move(name), std::move(value)}); }");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                _cppOutputAnonymousFieldGetter.append(String("void _any_elem_") + cppName + "(" + toCppTypeIdentifierWithNamespace2(typeName) + "* element, std::string&& name, std::string&& value) { element->other_elements.emplace_back(xsd::any_element{std::move(name), std::move(value)}); }");
 
             String attributes("nullptr");
             if (!type.attributes.isEmpty())
@@ -1381,6 +1385,8 @@ private:
                 flags.append("xsdcpp::ElementInfo::EntryPointFlag");
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 flags.append("xsdcpp::ElementInfo::AnyAttributeFlag");
+            if (type.flags & Xsd::Type::AnyElementFlag)
+                flags.append("xsdcpp::ElementInfo::AnyElementFlag");
             if (mandatoryChildrenCount)
                 flags.append("xsdcpp::ElementInfo::CheckChildrenFlag");
 
@@ -1396,12 +1402,13 @@ private:
             if (!flags.isEmpty())
                 flagsStr.join(flags, '|');
 
-            _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr 
+            _cppOutputNamespace.append(String("const xsdcpp::ElementInfo _") + cppName + "_Info = { " + flagsStr
                 + ", " + addTextFunction
                 + ", " + children + ", " + String::fromUInt64(childrenCount)
                 + ", " + attributes + ", " + String::fromUInt64(checkAttributesMask) + "ULL"
-                + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info") 
+                + ", " + (parentElementCppName.isEmpty() ? String("nullptr") : String("&") + toCppNamespacePrefix(type.baseType) + "::_" + parentElementCppName + "_Info")
                 + ", " + (type.flags & Xsd::Type::AnyAttributeFlag ? String("(xsdcpp::set_any_attribute_t)&_any_") + cppName : String("nullptr"))
+                + ", " + (type.flags & Xsd::Type::AnyElementFlag ? String("(xsdcpp::set_any_element_t)&_any_elem_") + cppName : String("nullptr"))
                 + " };");
 
             _generatedElementInfos2.append(typeName);
@@ -1719,6 +1726,10 @@ private:
                 _cppOutputAnonymousSerialize.append(String("    for (const auto& item : ") + fieldAccess + fieldName + ") _serialize_" + elemTypeCppName + "(w, \"" + elemRef.name.name + "\", item);");
             }
         }
+
+        // Serialize xs:any elements captured in other_elements
+        if (type.flags & Xsd::Type::AnyElementFlag)
+            _cppOutputAnonymousSerialize.append(String("    for (const auto& e : ") + fieldAccess + "other_elements) { w.startElement(e.name.c_str()); w.writeText(e.value); w.endElement(e.name.c_str()); }");
     }
 
     String toGetStringCall(const Xsd::Name& typeName, const String& value)
