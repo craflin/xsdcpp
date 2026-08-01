@@ -155,20 +155,26 @@ private:
         {
             Xsd::Type& type = *i;
 
-            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+            for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(); i != type.elements.end();)
             {
                 Xsd::ElementRef& elementRef = *i;
 
                 if (elementRef.refName.name.isEmpty())
+                {
+                    ++i;
                     continue;
+                }
 
                 Xsd::Name substitutionGroupTypeName = elementRef.refName;
                 substitutionGroupTypeName.name.append("_group_t");
 
                 if (_output.types.contains(substitutionGroupTypeName))
+                {
                     elementRef.typeName = substitutionGroupTypeName;
+                    ++i;
+                }
                 else
-                    elementRef.refName = Xsd::Name();
+                    i = type.elements.remove(i);
             }
         }
     }
@@ -462,6 +468,7 @@ private:
             if (getXmlAttribute(*refPos.element, "abstract", "false").toBool() &&
                 getXmlAttribute(*refPos.element, "type").isEmpty())
             {
+                elementRef.name = refName;
                 elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
                 elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
                 elementRef.refName = refName;
@@ -588,6 +595,41 @@ private:
             elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
             elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
             elementRef.maxOccurs = parseOccurs(getXmlAttribute(*position.element, "maxOccurs", "1"));
+
+            // add the type to its substitution group
+            String substitutionGroupWithNamespacePrefix = getXmlAttribute(*position.element, "substitutionGroup");
+            if (!substitutionGroupWithNamespacePrefix.isEmpty())
+            {
+                Xsd::Name substitutionGroup;
+                if (!resolveNamespacePrefix(position, substitutionGroupWithNamespacePrefix, substitutionGroup))
+                    return false;
+
+                Xsd::Name substitutionGroupTypeName = substitutionGroup;
+                substitutionGroupTypeName.name.append("_group_t");
+
+                Xsd::Type& type  = _output.types.append(substitutionGroupTypeName, Xsd::Type(), false);
+
+                bool addNewGroupMember = true;
+                for (List<Xsd::ElementRef>::Iterator i = type.elements.begin(), end = type.elements.end(); i != end; ++i)
+                {
+                    const Xsd::ElementRef& elementRefInGroup = *i;
+                    if (elementRefInGroup.name == elementRef.name)
+                    {
+                        addNewGroupMember = false;
+                        break;
+                    }
+                }
+
+                if (addNewGroupMember)
+                {
+                    type.kind = Xsd::Type::Kind::SubstitutionGroupKind;
+                    Xsd::ElementRef& elementRefInGroup = type.elements.append(Xsd::ElementRef());
+                    elementRefInGroup.name = elementRef.name;
+                    elementRefInGroup.typeName = elementRef.typeName;
+                    elementRefInGroup.minOccurs = 0;
+                }
+            }
+
             return true;
         }
 
@@ -1163,7 +1205,7 @@ private:
                 if (!processXsElement(elementPosition, parentTypeName, elementRef))
                     return false;
 
-                if (elementRef.name.name.isEmpty() || elementRef.typeName.name.isEmpty())
+                if (elementRef.name.name.isEmpty() || (elementRef.typeName.name.isEmpty() && elementRef.refName.name.isEmpty()))
                     continue;
 
                 // Skip if an element with the same name already exists (can happen with choice branches)
