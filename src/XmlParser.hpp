@@ -1,6 +1,7 @@
 
 #include <string>
 #include <cstdint>
+#include <vector>
 
 namespace xsdcpp {
 
@@ -12,6 +13,7 @@ typedef void* (*get_field_t)(void*);
 typedef void (*set_value_t)(void* obj, const Position&, std::string&&);
 typedef void (*set_default_t)(void*);
 typedef void (*set_any_attribute_t)(void*, std::string&& name, std::string&& value);
+typedef void (*set_any_element_t)(void*, std::string&& name, std::string&& value);
 
 struct ChildElementInfo
 {
@@ -42,6 +44,7 @@ struct ElementInfo
         SkipProcessingFlag = 0x04,
         AnyAttributeFlag = 0x08,
         CheckChildrenFlag = 0x10,
+        AnyElementFlag = 0x20,
     };
     
     size_t flags;
@@ -52,13 +55,14 @@ struct ElementInfo
     uint64_t checkAttributeMask;
     const ElementInfo* base;
     set_any_attribute_t setOtherAttribute;
+    set_any_element_t setOtherElement;
 };
 
 struct ElementContext
 {
     const ElementInfo* info;
     void* element;
-    size_t processedElements2[64];
+    std::vector<size_t> processedElements2;
     uint64_t processedAttributes2;
 
     ElementContext(const ElementInfo* info, void* element);

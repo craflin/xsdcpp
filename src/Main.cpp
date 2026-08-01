@@ -19,6 +19,20 @@ Options:\n\
     -o <output-dir>, --output=<output-dir>\n\
         The folder in which the output files are created.\n\
 \n\
+    -H <output-dir>, --header-output=<output-dir>\n\
+        The folder in which the header files (.hpp) are created. Overrides -o\n\
+        for header files.\n\
+\n\
+    -C <output-dir>, --cpp-output=<output-dir>\n\
+        The folder in which the implementation files (.cpp) are created.\n\
+        Overrides -o for implementation files.\n\
+\n\
+    -P <prefix>, --include-prefix=<prefix>\n\
+        The prefix to use for #include directives in generated .cpp files.\n\
+        Use this when headers are in a different directory structure than\n\
+        sources. For example, if headers are in include/mylib/ and the\n\
+        include path is include/, use -P mylib.\n\
+\n\
     -e <namespace>, --extern=<namespace>\n\
         A namespace that should not be generated in the output files and hence\n\
         must be provided separately. This should be used to avoid code\n\
@@ -28,8 +42,14 @@ Options:\n\
         generated data models to the same library or executable.\n\
 \n\
     -n <namespace>, --name=<namespace>\n\
-        The namespace used for the generated data model and base name of the\n\
-        output files. The default, is derived from <xsd-file>.\n\
+        The namespace used for the generated data model (inner namespace) and\n\
+        base name of the output files. The default is derived from <xsd-file>.\n\
+        Use this to rename the inner namespace when combined with -w.\n\
+\n\
+    -w <namespace>, --wrap-namespace=<namespace>\n\
+        Wrap all generated code in an additional C++ namespace. Supports nested\n\
+        namespaces using '::' syntax (e.g., 'a::b::c'). Combined with -n, this\n\
+        allows full control over the namespace structure.\n\
 \n\
     -t <type>, --type=<type>\n\
         By default, C++ type definitions are only generated for types that are\n\
@@ -45,13 +65,21 @@ int main(int argc, char* argv[])
 {
     String inputFile;
     String outputDir = ".";
+    String headerOutputDir;
+    String cppOutputDir;
     String name;
+    String wrapNamespace;
+    String includePrefix;
     List<String> externalNamespacePrefixes;
     List<String> forceTypeProcessing;
     {
         Process::Option options[] = {
             {'o', "output", Process::argumentFlag},
+            {'H', "header-output", Process::argumentFlag},
+            {'C', "cpp-output", Process::argumentFlag},
+            {'P', "include-prefix", Process::argumentFlag},
             {'n', "name", Process::argumentFlag},
+            {'w', "wrap-namespace", Process::argumentFlag},
             {'h', "help", Process::optionFlag},
             {'e', "extern", Process::argumentFlag},
             {'t', "type", Process::argumentFlag},
@@ -66,8 +94,20 @@ int main(int argc, char* argv[])
             case 'o':
                 outputDir = argument;
                 break;
+            case 'H':
+                headerOutputDir = argument;
+                break;
+            case 'C':
+                cppOutputDir = argument;
+                break;
+            case 'P':
+                includePrefix = argument;
+                break;
             case 'n':
                 name = argument;
+                break;
+            case 'w':
+                wrapNamespace = argument;
                 break;
             case 'e':
                 externalNamespacePrefixes.append(argument);
@@ -89,6 +129,11 @@ int main(int argc, char* argv[])
                 return 1;
             }
     }
+    // Use outputDir as default if specific directories not set
+    if (headerOutputDir.isEmpty())
+        headerOutputDir = outputDir;
+    if (cppOutputDir.isEmpty())
+        cppOutputDir = outputDir;
     if (inputFile.isEmpty())
     {
         usage(argv[0]);
@@ -98,7 +143,7 @@ int main(int argc, char* argv[])
     String error;
     Xsd xsd;
     if (!readXsd(name, inputFile, forceTypeProcessing, xsd, error) ||
-        !generateCpp(xsd, outputDir, externalNamespacePrefixes, forceTypeProcessing, error))
+        !generateCpp(xsd, headerOutputDir, cppOutputDir, externalNamespacePrefixes, forceTypeProcessing, wrapNamespace, includePrefix, error))
     {
         Console::errorf("error: %s\n", (const char*)error);
         return 1;

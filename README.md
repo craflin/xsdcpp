@@ -25,7 +25,7 @@ XSDCPP solves the issue by creating a data model and parser that can easily be a
 
 ## Features and Limitations
 
-Since XSD is full of features (and unnecessary complexity), its very hard to support all of them. 
+Since XSD is full of features (and unnecessary complexity), its very hard to support all of them.
 So, XSDCPP does currently just support what was thrown at it so far and there are probably some severe limitations.
 
 Notable supported features:
@@ -60,6 +60,47 @@ Intentionally not supported features:
 * Clone the Git repository. `git clone https://github.com/craflin/xsdcpp.git`
 * Initialize submodules. `cd xsdcpp && git submodule update --init`
 * Build the project using CMake (`mkdir build && cd build && cmake .. && cmake --build .`) or Conan (`mkdir build && cd build && conan install .. && conan build ..`).
+
+## Command Line Options
+
+```
+xsdcpp [<xsd-file>] [options]
+```
+
+| Option                              | Description                                                                                                                                                                                                                                                                 |
+|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-o <dir>`, `--output=<dir>`        | The folder in which the output files are created.                                                                                                                                                                                                                           |
+| `-H <dir>`, `--header-output=<dir>` | The folder in which the header files (.hpp) are created. Overrides `-o` for header files.                                                                                                                                                                                   |
+| `-C <dir>`, `--cpp-output=<dir>`    | The folder in which the implementation files (.cpp) are created. Overrides `-o` for implementation files.                                                                                                                                                                   |
+| `-n <name>`, `--name=<name>`        | The namespace used for the generated data model and base name of the output files. The default is derived from the XSD filename.                                                                                                                                            |
+| `-w <ns>`, `--wrap-namespace=<ns>`  | Wrap all generated code in an additional C++ namespace. Supports nested namespaces using `::` syntax (e.g., `a::b::c`).                                                                                                                                                     |
+| `-P <prefix>`, `--include-prefix=<prefix>` | Prefix for `#include` directives in generated `.cpp` files. Use when headers are in a different directory structure than sources.                                                                                                                              |
+| `-e <ns>`, `--extern=<ns>`          | A namespace that should not be generated in the output files and hence must be provided separately. Use this to avoid code duplication if you have a schema that is the base for multiple other schemas. Set to `xsdcpp` to omit the generation of the core parser library. |
+| `-t <type>`, `--type=<type>`        | Enforce the generation of a type that is not directly referenced from a root element. Can be specified multiple times.                                                                                                                                                      |
+
+### Examples
+
+Basic usage:
+```
+xsdcpp Example.xsd -o /your/output/folder
+```
+
+Separate header and implementation directories:
+```
+xsdcpp Example.xsd -H include/ -C src/
+```
+
+Wrap generated code in a namespace:
+```
+xsdcpp Example.xsd -o out/ -w myproject::xml
+```
+This generates types like `myproject::xml::Example::Person`.
+
+Rename the inner namespace and wrap in an outer namespace:
+```
+xsdcpp Example.xsd -o out/ -w myproject::xml -n types
+```
+This generates types like `myproject::xml::types::Person`.
 
 ## Example
 
@@ -160,10 +201,12 @@ struct Country : xsd::base<Example::CountryCode>
 
 }
 ```
-And functions to load an XML file or XML data from a string:
+And functions to load and save XML:
 ```cpp
-void load_file(const std::string& file, List& List);
-void load_data(const std::string& data, List& List);
+void load_file(const std::string& file, List& list);
+void load_data(const std::string& data, List& list);
+void save_file(const std::string& file, const List& list);
+std::string save_data(const List& list);
 ```
 (The implementation of these functions can be found in *Example.cpp* and *Example_xsd.hpp* provides the types of the *xsd* namespace.)
 
