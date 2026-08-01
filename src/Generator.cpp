@@ -1005,8 +1005,23 @@ private:
             String cppName = toCppTypeIdentifier2(typeName);
             _hppOutput.append(String("enum class ") + cppName);
             _hppOutput.append("{");
+            HashSet<String> usedEnumValues;
             for (List<String>::Iterator i = type.enumEntries.begin(), end = type.enumEntries.end(); i != end; ++i)
-                _hppOutput.append(String("    ") + toCppIdentifier(*i) + ",");
+            {
+                String enumValue = toCppIdentifier(*i);
+                // Handle duplicate enum values by appending a counter
+                if (usedEnumValues.contains(enumValue))
+                {
+                    int counter = 2;
+                    String uniqueValue;
+                    do {
+                        uniqueValue = enumValue + "_" + String::fromInt(counter++);
+                    } while (usedEnumValues.contains(uniqueValue));
+                    enumValue = uniqueValue;
+                }
+                usedEnumValues.append(enumValue);
+                _hppOutput.append(String("    ") + enumValue + ",");
+            }
             _hppOutput.append("};");
             _hppOutput.append("");
             _hppOutput.append(String("std::string to_string(") + cppName + ");");
@@ -1097,7 +1112,10 @@ private:
             List<String> structDefintiion;
             if (baseType)
             {
-                if (baseType->kind == Xsd::Type::BaseKind || baseType->kind == Xsd::Type::EnumKind)
+                // Use xsd::base<> wrapper for primitive-derived types (BaseKind, EnumKind, SimpleRefKind)
+                // These are typedefs that can't be directly inherited in C++
+                if (baseType->kind == Xsd::Type::BaseKind || baseType->kind == Xsd::Type::EnumKind ||
+                    baseType->kind == Xsd::Type::SimpleRefKind)
                     structDefintiion.append(String("struct ") + cppName + " : xsd::base<" + toCppTypeIdentifierWithNamespace2(type.baseType) + ">");
                 else
                     structDefintiion.append(String("struct ") + cppName + " : " + toCppTypeIdentifierWithNamespace2(type.baseType));
