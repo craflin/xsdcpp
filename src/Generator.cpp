@@ -1197,7 +1197,7 @@ private:
                 if (optionalWithoutDefaultValue)
                     structFields.append(String("xsd::optional<") + toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + "> " + toCppFieldIdentifier(attributeRef.name));
                 else
-                    structFields.append(toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + " " + toCppFieldIdentifier(attributeRef.name));
+                    structFields.append(toCppTypeIdentifierWithNamespace2(attributeRef.typeName) + " " + toCppFieldIdentifier(attributeRef.name) + "{}");
             }
             if (type.flags & Xsd::Type::AnyAttributeFlag)
                 structFields.append("xsd::vector<xsd::any_attribute> other_attributes");
@@ -1210,7 +1210,7 @@ private:
                 if (!processType2(elementRef.typeName, level + 1, typeDefinitionRequired))
                     return false;
                 if (elementRef.minOccurs == 1 && elementRef.maxOccurs == 1)
-                    structFields.append(toCppTypeIdentifierWithNamespace2(elementRef.typeName) + " " + toCppFieldIdentifier(elementRef.name));
+                    structFields.append(toCppTypeIdentifierWithNamespace2(elementRef.typeName) + " " + toCppFieldIdentifier(elementRef.name) + "{}");
                 else if (elementRef.maxOccurs == 1)
                     structFields.append(String("xsd::optional<") + toCppTypeIdentifierWithNamespace2(elementRef.typeName) + "> " + toCppFieldIdentifier(elementRef.name));
                 else
