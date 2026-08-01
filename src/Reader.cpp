@@ -432,9 +432,10 @@ private:
             if (!refPos)
                 return (_error = String::fromPrintf("Could not find ref '%s'", (const char*)refName.name)), false;
 
-            // Abstract elements have no type definition - they serve as placeholders for substitution groups.
+            // Abstract elements without a type attribute serve as placeholders for substitution groups.
             // Record the reference for later resolution by resolveElementRefs().
-            if (getXmlAttribute(*refPos.element, "abstract", "false").toBool())
+            if (getXmlAttribute(*refPos.element, "abstract", "false").toBool() &&
+                getXmlAttribute(*refPos.element, "type").isEmpty())
             {
                 elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
                 elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
@@ -527,6 +528,7 @@ private:
             elementRef.typeName.name = parentTypeName.name + "_" + name + "_t";
             elementRef.typeName.xsdNamespace = position.xsdFileData->targetNamespace;
 
+            bool foundTypeDefinition = false;
             for (List<Xml::Variant>::Iterator i = position.element->content.begin(), end = position.element->content.end(); i != end; ++i)
             {
                 const Xml::Variant& variant = *i;
@@ -542,14 +544,26 @@ private:
                     if (!processTypeElement(childPosition, elementRef.typeName))
                         return false;
 
-                    elementRef.name.name = getXmlAttribute(*position.element, "name");
-                    elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
-                    elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
-                    elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
-                    return true;
+                    foundTypeDefinition = true;
+                    break;
                 }
             }
-            return (_error = String::fromPrintf("Could not find 'element', 'complexType' or 'simpleType' in '%s' (name='%s')", (const char*)position.element->type, (const char*)name)), false;
+
+            // Elements with no type attribute and no inline type definition default to xs:anyType.
+            // Map this to a string element type.
+            if (!foundTypeDefinition)
+            {
+                Xsd::Type& type = _output.types.append(elementRef.typeName, Xsd::Type());
+                type.kind = Xsd::Type::ElementKind;
+                type.baseType.name = "string";
+                type.baseType.xsdNamespace = "http://www.w3.org/2001/XMLSchema";
+            }
+
+            elementRef.name.name = getXmlAttribute(*position.element, "name");
+            elementRef.name.xsdNamespace = position.xsdFileData->targetNamespace;
+            elementRef.minOccurs = getXmlAttribute(*position.element, "minOccurs", "1").toUInt();
+            elementRef.maxOccurs = getXmlAttribute(*position.element, "maxOccurs", "1").toUInt();
+            return true;
         }
 
         return (_error = String::fromPrintf("Missing element 'ref', 'type' or 'name' attribute in '%s'", (const char*)position.element->type)), false;
