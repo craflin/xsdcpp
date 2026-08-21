@@ -530,6 +530,7 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
+                text = unescapeString(text.c_str(), text.size());
                 elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
@@ -629,6 +630,25 @@ std::string to_string(size_t val, size_t size, const char* const* values, const 
     return values[val];
 }
 
+bool parse_xs_bool(std::stringstream& ss, bool& val)
+{
+    bool b;
+
+    std::streampos pos = ss.tellg();
+
+    if (!(ss >> std::boolalpha >> b))
+    {
+        ss.clear();
+        ss.seekg(pos);
+
+        if (!(ss >> std::noboolalpha >> b))
+            return false;
+    }
+
+    val = b;
+    return true;
+}
+
 void set_string(std::string* obj, const Position&, std::string&& val) { if (obj->empty()) *obj = std::move(val); else *obj += val; }
 void set_uint64_t(uint64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected unsigned 64-bit integer value"); }
 void set_int64_t(int64_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected 64-bit integer value"); }
@@ -638,7 +658,7 @@ void set_uint16_t(uint16_t* obj,  const Position& pos, std::string&& val) { std:
 void set_int16_t(int16_t* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected 16-bit integer value"); }
 void set_float(float* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected single precision floating point value"); }
 void set_double(double* obj,  const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> *obj)) throw VerificationException(pos, "Expected double precision floating point value"); }
-void set_bool(bool* obj, const Position& pos, std::string&& val) { std::stringstream ss(val); if (!(ss >> std::boolalpha >> *obj)) throw VerificationException(pos, "Expected boolean value"); }
+void set_bool(bool* obj, const Position& pos, std::string&& val) { std::stringstream ss(val); if (!parse_xs_bool(ss, *obj)) throw VerificationException(pos, "Expected boolean value"); }
 
 std::string read_file(const std::string& filePath)
 {
