@@ -251,6 +251,7 @@ public:
 
             _hppOutput.append(String("void load_file(const std::string& file, ") + elementTypeCppName + "& " + elementCppName + ");");
             _hppOutput.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& " + elementCppName + ");");
+            _hppOutput.append(String("void load_data(const char* data, ") + elementTypeCppName + "& " + elementCppName + ");");
             _hppOutput.append("");
         }
 
@@ -295,12 +296,18 @@ public:
             String elementTypeCppName = toCppTypeIdentifier2(i->typeName);
             String elementCppName = toCppFieldIdentifier(i->name);
 
-            _cppOutputFinal.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
+            _cppOutputFinal.append(String("void load_data(const char* data, ") + elementTypeCppName + "& output)");
             _cppOutputFinal.append("{");
             _cppOutputFinal.append(String("    ") + rootTypeCppName + " rootElement;");
             _cppOutputFinal.append(String("    xsdcpp::ElementContext elementContext(&_") + rootTypeCppName + "_Info, &rootElement);");
-            _cppOutputFinal.append("    xsdcpp::parse(data.c_str(), _namespaces, elementContext);");
+            _cppOutputFinal.append("    xsdcpp::parse(data, _namespaces, elementContext);");
             _cppOutputFinal.append(String("    output = std::move(rootElement.") + elementCppName + ");");
+            _cppOutputFinal.append("}");
+            _cppOutputFinal.append("");
+
+            _cppOutputFinal.append(String("void load_data(const std::string& data, ") + elementTypeCppName + "& output)");
+            _cppOutputFinal.append("{");
+            _cppOutputFinal.append("    load_data(data.c_str(), output);");
             _cppOutputFinal.append("}");
             _cppOutputFinal.append("");
 
