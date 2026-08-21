@@ -530,6 +530,7 @@ void parseElement(Context& context, xsdcpp::ElementContext& parentElementContext
             if (context.pos.pos != start)
             {
                 std::string text = stripComments(start, context.pos.pos - start);
+                text = unescapeString(text.c_str(), text.size());
                 elementContext.info->addText(elementContext.element, context.pos, std::move(text));
             }
         }
